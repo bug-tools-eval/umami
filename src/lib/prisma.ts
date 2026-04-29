@@ -259,10 +259,9 @@ async function rawQuery(sql: string, data: Record<string, any>, name?: string): 
     log('NAME:\n', name);
   }
   const params = [];
-  const schema = getSchema();
 
-  if (schema) {
-    await client.$executeRawUnsafe(`SET search_path TO "${schema}";`);
+  if (cachedSchema) {
+    await client.$executeRawUnsafe(`SET search_path TO "${cachedSchema}";`);
   }
 
   const query = sql?.replaceAll(/\{\{\s*(\w+)(::\w+)?\s*}}/g, (...args) => {
@@ -366,6 +365,8 @@ function getSchema() {
 
   return connectionUrl.searchParams.get('schema');
 }
+
+const cachedSchema = process.env.DATABASE_URL ? getSchema() : null;
 
 function getClient() {
   const url = process.env.DATABASE_URL;
