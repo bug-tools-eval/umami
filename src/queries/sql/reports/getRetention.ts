@@ -42,6 +42,57 @@ async function relationalQuery(
     endDate,
     timezone,
   });
+  const hasQueryFilters = [filterQuery, joinSessionQuery, cohortQuery].some(query => query.trim());
+
+  if (!hasQueryFilters) {
+    return rawQuery(
+      `
+      WITH session_days AS (
+        select
+          website_event.session_id,
+          ${getDateSQL('website_event.created_at', unit, timezone)} as activity_date
+        from website_event
+        where website_event.website_id = {{websiteId::uuid}}
+          and website_event.created_at between {{startDate}} and {{endDate}}
+        group by 1, 2
+      ),
+      cohort_items AS (
+        select
+          min(activity_date) as cohort_date,
+          session_id
+        from session_days
+        group by session_id
+      ),
+      cohort_size as (
+        select cohort_date,
+          count(*) as visitors
+        from cohort_items
+        group by 1
+      ),
+      cohort_date as (
+        select
+          c.cohort_date,
+          ${getDayDiffQuery('d.activity_date', 'c.cohort_date')} as day_number,
+          count(*) as visitors
+        from session_days d
+        join cohort_items c
+        on d.session_id = c.session_id
+        group by 1, 2
+      )
+      select
+        c.cohort_date as date,
+        c.day_number as day,
+        s.visitors,
+        c.visitors as "returnVisitors",
+        ${getCastColumnQuery('c.visitors', 'float')} * 100 / s.visitors as percentage
+      from cohort_date c
+      join cohort_size s
+      on c.cohort_date = s.cohort_date
+      where c.day_number <= 31
+      order by 1, 2`,
+      queryParams,
+    );
+  }
 
   return rawQuery(
     `
@@ -116,6 +167,57 @@ async function clickhouseQuery(
     endDate,
     timezone,
   });
+  const hasQueryFilters = [filterQuery, cohortQuery].some(query => query.trim());
+
+  if (!hasQueryFilters) {
+    return rawQuery(
+      `
+      WITH session_days AS (
+        select
+          session_id,
+          ${getDateSQL('created_at', unit, timezone)} as activity_date
+        from website_event
+        where website_id = {websiteId:UUID}
+          and created_at between {startDate:DateTime64} and {endDate:DateTime64}
+        group by session_id, activity_date
+      ),
+      cohort_items AS (
+        select
+          min(activity_date) as cohort_date,
+          session_id
+        from session_days
+        group by session_id
+      ),
+      cohort_size as (
+        select cohort_date,
+          count(*) as visitors
+        from cohort_items
+        group by 1
+      ),
+      cohort_date as (
+        select
+          c.cohort_date,
+          toInt32((d.activity_date - c.cohort_date) / 86400) as day_number,
+          count(*) as visitors
+        from session_days d
+        join cohort_items c
+        on d.session_id = c.session_id
+        group by 1, 2
+      )
+      select
+        c.cohort_date as date,
+        c.day_number as day,
+        s.visitors as visitors,
+        c.visitors returnVisitors,
+        c.visitors * 100 / s.visitors as percentage
+      from cohort_date c
+      join cohort_size s
+      on c.cohort_date = s.cohort_date
+      where c.day_number <= 31
+      order by 1, 2`,
+      queryParams,
+    );
+  }
 
   return rawQuery(
     `
