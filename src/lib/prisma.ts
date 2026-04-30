@@ -309,6 +309,7 @@ async function pagedRawQuery(
   queryParams: Record<string, any>,
   filters: QueryFilters,
   name?: string,
+  countQuery?: string,
 ) {
   const { page = 1, pageSize, orderBy, sortDescending = false } = filters;
   const size = +pageSize || DEFAULT_PAGE_SIZE;
@@ -322,9 +323,8 @@ async function pagedRawQuery(
     .filter(n => n)
     .join('\n');
 
-  const count = await rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(
-    res => res[0].num,
-  );
+  const countSql = countQuery || `select count(*) as num from (${query}) t`;
+  const count = await rawQuery(countSql, queryParams).then(res => res[0].num);
 
   const data = await rawQuery(`${query}${statements}`, queryParams, name);
 

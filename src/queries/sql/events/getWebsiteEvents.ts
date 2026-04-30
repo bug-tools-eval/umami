@@ -15,7 +15,7 @@ export function getWebsiteEvents(...args: [websiteId: string, filters: QueryFilt
 async function relationalQuery(websiteId: string, filters: QueryFilters) {
   const { pagedRawQuery, parseFilters } = prisma;
   const { search } = filters;
-  const { filterQuery, dateQuery, cohortQuery, queryParams } = parseFilters({
+  const { filterQuery, dateQuery, cohortQuery, joinSessionQuery, queryParams } = parseFilters({
     ...filters,
     websiteId,
   });
@@ -63,6 +63,16 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
     queryParams,
     filters,
     FUNCTION_NAME,
+    `
+    select count(*) as num
+    from website_event
+    ${cohortQuery}
+    ${joinSessionQuery}
+    where website_event.website_id = {{websiteId::uuid}}
+    ${dateQuery}
+    ${filterQuery}
+    ${searchQuery}
+    `,
   );
 }
 
@@ -115,5 +125,14 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
     queryParams,
     filters,
     FUNCTION_NAME,
+    `
+    select count() as num
+    from website_event
+    ${cohortQuery}
+    where website_id = {websiteId:UUID}
+    ${dateQuery}
+    ${filterQuery}
+    ${searchQuery}
+    `,
   );
 }
