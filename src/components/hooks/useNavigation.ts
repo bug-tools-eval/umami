@@ -1,17 +1,18 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { buildPath } from '@/lib/url';
 
 export function useNavigation() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const search = searchParams.toString();
   const [, teamId] = pathname.match(/\/teams\/([a-f0-9-]+)/) || [];
   const [, websiteId] = pathname.match(/\/websites\/([a-f0-9-]+)/) || [];
   const [, linkId] = pathname.match(/\/links\/([a-f0-9-]+)/) || [];
   const [, pixelId] = pathname.match(/\/pixels\/([a-f0-9-]+)/) || [];
   const [, boardId] = pathname.match(/\/boards\/([a-f0-9-]+)/) || [];
-  const [queryParams, setQueryParams] = useState(Object.fromEntries(searchParams));
+  const queryParams = useMemo(() => Object.fromEntries(searchParams), [search]);
 
   const updateParams = useCallback(
     (params?: Record<string, string | number>) => {
@@ -36,10 +37,6 @@ export function useNavigation() {
     },
     [teamId, queryParams],
   );
-
-  useEffect(() => {
-    setQueryParams(Object.fromEntries(searchParams));
-  }, [searchParams.toString()]);
 
   return {
     router,

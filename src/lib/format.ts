@@ -1,5 +1,7 @@
 import { DEFAULT_CURRENCY } from './constants';
 
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+
 export function parseTime(val: number) {
   const days = ~~(val / 86400);
   const hours = ~~(val / 3600) - days * 24;
@@ -85,22 +87,31 @@ export function stringToColor(str: string) {
 }
 
 export function formatCurrency(value: number, currency: string, locale = 'en-US') {
-  let formattedValue: Intl.NumberFormat;
+  const key = `${locale}:${currency}`;
+  const cachedFormatter = currencyFormatters.get(key);
+
+  if (cachedFormatter) {
+    return cachedFormatter.format(value);
+  }
+
+  let formatter: Intl.NumberFormat;
 
   try {
-    formattedValue = new Intl.NumberFormat(locale, {
+    formatter = new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: currency,
     });
   } catch {
     // Fallback to default currency format if an error occurs
-    formattedValue = new Intl.NumberFormat(locale, {
+    formatter = new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: DEFAULT_CURRENCY,
     });
   }
 
-  return formattedValue.format(value);
+  currencyFormatters.set(key, formatter);
+
+  return formatter.format(value);
 }
 
 export function formatLongCurrency(value: number, currency: string, locale = 'en-US') {
