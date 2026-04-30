@@ -253,11 +253,12 @@ async function pagedRawQuery(
     .filter(n => n)
     .join('\n');
 
-  const count = await rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(
-    res => res[0].num,
-  );
-
-  const data = await rawQuery(`${query}${statements}`, queryParams, name);
+  const [count, data] = await Promise.all([
+    rawQuery<{ num: number }[]>(`select count(*) as num from (${query}) t`, queryParams).then(
+      res => res[0].num,
+    ),
+    rawQuery(`${query}${statements}`, queryParams, name),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy, search };
 }
