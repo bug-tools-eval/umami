@@ -20,22 +20,29 @@ export async function POST(request: Request) {
     return unauthorized();
   }
 
-  const parameters = await setWebsiteDate(websiteId, body.parameters);
-  const filters = await getQueryFilters(body.filters, websiteId);
-
-  const [{ chart }, total, metrics] = await Promise.all([
-    getRevenue(websiteId, parameters as RevenuParameters, filters),
-    getRevenueStats(websiteId, parameters as RevenuParameters, filters),
-    getRevenueMetrics(websiteId, parameters as RevenuParameters, filters),
+  const [parameters, filters] = await Promise.all([
+    setWebsiteDate(websiteId, body.parameters),
+    getQueryFilters(body.filters, websiteId),
   ]);
 
-  const { compare = 'prev' } = parameters as RevenuParameters;
-  const { startDate, endDate } = getCompareDate(compare, parameters.startDate, parameters.endDate);
-  const comparison = await getRevenueStats(
-    websiteId,
-    { ...(parameters as RevenuParameters), startDate, endDate },
-    filters,
+  const revenueParameters = parameters as RevenuParameters;
+  const { compare = 'prev' } = revenueParameters;
+  const { startDate: compareStartDate, endDate: compareEndDate } = getCompareDate(
+    compare,
+    parameters.startDate,
+    parameters.endDate,
   );
+
+  const [{ chart }, total, metrics, comparison] = await Promise.all([
+    getRevenue(websiteId, revenueParameters, filters),
+    getRevenueStats(websiteId, revenueParameters, filters),
+    getRevenueMetrics(websiteId, revenueParameters, filters),
+    getRevenueStats(
+      websiteId,
+      { ...revenueParameters, startDate: compareStartDate, endDate: compareEndDate },
+      filters,
+    ),
+  ]);
 
   return json({ chart, total: { ...total, comparison }, ...metrics });
 }

@@ -53,8 +53,14 @@ export function md5(...args: string[]) {
   return crypto.createHash('md5').update(args.join('')).digest('hex');
 }
 
+let cachedSecret: { source: string; value: string } | null = null;
+
 export function secret() {
-  return hash(process.env.APP_SECRET || process.env.DATABASE_URL);
+  const source = process.env.APP_SECRET || process.env.DATABASE_URL || '';
+  if (cachedSecret?.source !== source) {
+    cachedSecret = { source, value: hash(source) };
+  }
+  return cachedSecret.value;
 }
 
 export function uuid(...args: any) {

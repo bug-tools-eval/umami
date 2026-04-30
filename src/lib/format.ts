@@ -84,23 +84,24 @@ export function stringToColor(str: string) {
   return color;
 }
 
-export function formatCurrency(value: number, currency: string, locale = 'en-US') {
-  let formattedValue: Intl.NumberFormat;
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
 
-  try {
-    formattedValue = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: currency,
-    });
-  } catch {
-    // Fallback to default currency format if an error occurs
-    formattedValue = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: DEFAULT_CURRENCY,
-    });
+function getCurrencyFormatter(locale: string, currency: string): Intl.NumberFormat {
+  const key = `${locale}|${currency}`;
+  let fmt = currencyFormatters.get(key);
+  if (!fmt) {
+    try {
+      fmt = new Intl.NumberFormat(locale, { style: 'currency', currency });
+    } catch {
+      fmt = new Intl.NumberFormat(locale, { style: 'currency', currency: DEFAULT_CURRENCY });
+    }
+    currencyFormatters.set(key, fmt);
   }
+  return fmt;
+}
 
-  return formattedValue.format(value);
+export function formatCurrency(value: number, currency: string, locale = 'en-US') {
+  return getCurrencyFormatter(locale, currency).format(value);
 }
 
 export function formatLongCurrency(value: number, currency: string, locale = 'en-US') {

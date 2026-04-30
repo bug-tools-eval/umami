@@ -1,5 +1,5 @@
 import { useTheme } from '@umami/react-zen';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { BarChart, type BarChartProps } from '@/components/charts/BarChart';
 import { useLocale, useMessages } from '@/components/hooks';
 import { renderDateLabels } from '@/lib/charts';
@@ -80,9 +80,9 @@ export function PageviewsChart({ data, unit, minDate, maxDate, ...props }: Pagev
           : []),
       ],
     };
-  }, [data, locale]);
+  }, [data, locale, minDate, maxDate, unit, dateLocale, colors, t, labels]);
 
-  const renderXLabel = useCallback(renderDateLabels(unit, locale), [unit, locale]);
+  const renderXLabel = useMemo(() => renderDateLabels(unit, locale), [unit, locale]);
 
   return (
     <BarChart
