@@ -137,34 +137,37 @@ export async function getClientInfo(request: Request, payload: Record<string, an
   return { userAgent, browser, os, ip, country, region, city, device };
 }
 
+type ParsedIgnoreEntry = { ip: string; range?: ReturnType<typeof ipaddr.parseCIDR> };
+
+let cachedIgnoreSource: string | undefined;
+let cachedIgnoreEntries: ParsedIgnoreEntry[] = [];
+
+function getIgnoreEntries(source: string | undefined): ParsedIgnoreEntry[] {
+  if (source === cachedIgnoreSource) return cachedIgnoreEntries;
+
+  cachedIgnoreSource = source;
+  cachedIgnoreEntries = source
+    ? source.split(',').map(raw => {
+        const ip = raw.trim();
+        return ip.indexOf('/') > 0 ? { ip, range: ipaddr.parseCIDR(ip) } : { ip };
+      })
+    : [];
+
+  return cachedIgnoreEntries;
+}
+
 export function hasBlockedIp(clientIp: string) {
-  const ignoreIps = process.env.IGNORE_IP;
+  const entries = getIgnoreEntries(process.env.IGNORE_IP);
 
-  if (ignoreIps) {
-    const ips = [];
+  if (!entries.length) return false;
 
-    if (ignoreIps) {
-      ips.push(...ignoreIps.split(',').map(n => n.trim()));
-    }
+  let parsedClient: ipaddr.IPv4 | ipaddr.IPv6 | undefined;
 
-    return ips.find(ip => {
-      if (ip === clientIp) {
-        return true;
-      }
+  return entries.some(({ ip, range }) => {
+    if (ip === clientIp) return true;
+    if (!range) return false;
 
-      // CIDR notation
-      if (ip.indexOf('/') > 0) {
-        const addr = ipaddr.parse(clientIp);
-        const range = ipaddr.parseCIDR(ip);
-
-        if (addr.kind() === range[0].kind() && addr.match(range)) {
-          return true;
-        }
-      }
-
-      return false;
-    });
-  }
-
-  return false;
+    if (!parsedClient) parsedClient = ipaddr.parse(clientIp);
+    return parsedClient.kind() === range[0].kind() && parsedClient.match(range);
+  });
 }

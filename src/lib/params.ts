@@ -1,13 +1,11 @@
 import { FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
 import type { Filter, QueryFilters, QueryOptions } from '@/lib/types';
 
+const OPERATOR_REGEX = new RegExp(`^(${Object.values(OPERATORS).join('|')})\\.(.*)$`);
+
 export function parseFilterValue(param: any) {
   if (typeof param === 'string') {
-    const operatorValues = Object.values(OPERATORS).join('|');
-
-    const regex = new RegExp(`^(${operatorValues})\\.(.*)$`);
-
-    const [, operator, value] = param.match(regex) || [];
+    const [, operator, value] = param.match(OPERATOR_REGEX) || [];
 
     const resolvedOperator = operator || OPERATORS.equals;
     const resolvedValue = value ?? param;
