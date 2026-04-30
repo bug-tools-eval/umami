@@ -2,16 +2,29 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { buildPath } from '@/lib/url';
 
+const PATH_ID_PATTERNS = {
+  teams: /\/teams\/([a-f0-9-]+)/,
+  websites: /\/websites\/([a-f0-9-]+)/,
+  links: /\/links\/([a-f0-9-]+)/,
+  pixels: /\/pixels\/([a-f0-9-]+)/,
+  boards: /\/boards\/([a-f0-9-]+)/,
+};
+
 export function useNavigation() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams.toString();
-  const [, teamId] = pathname.match(/\/teams\/([a-f0-9-]+)/) || [];
-  const [, websiteId] = pathname.match(/\/websites\/([a-f0-9-]+)/) || [];
-  const [, linkId] = pathname.match(/\/links\/([a-f0-9-]+)/) || [];
-  const [, pixelId] = pathname.match(/\/pixels\/([a-f0-9-]+)/) || [];
-  const [, boardId] = pathname.match(/\/boards\/([a-f0-9-]+)/) || [];
+  const { teamId, websiteId, linkId, pixelId, boardId } = useMemo(
+    () => ({
+      teamId: getPathId(pathname, 'teams'),
+      websiteId: getPathId(pathname, 'websites'),
+      linkId: getPathId(pathname, 'links'),
+      pixelId: getPathId(pathname, 'pixels'),
+      boardId: getPathId(pathname, 'boards'),
+    }),
+    [pathname],
+  );
   const queryParams = useMemo(() => Object.fromEntries(searchParams), [search]);
 
   const updateParams = useCallback(
@@ -52,4 +65,10 @@ export function useNavigation() {
     replaceParams,
     renderUrl,
   };
+}
+
+function getPathId(pathname: string, segment: keyof typeof PATH_ID_PATTERNS) {
+  const [, id] = pathname.match(PATH_ID_PATTERNS[segment]) || [];
+
+  return id;
 }

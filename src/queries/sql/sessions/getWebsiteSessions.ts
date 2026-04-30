@@ -95,7 +95,7 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
 
   let sql = '';
 
-  if (EVENT_COLUMNS.some(item => Object.keys(filters).includes(item))) {
+  if (EVENT_COLUMNS.some(item => item in filters)) {
     sql = `
     select
       session_id as id,

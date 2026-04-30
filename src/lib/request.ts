@@ -116,14 +116,21 @@ export async function getQueryFilters(
   const filters = getRequestFilters(params);
 
   let match = params?.match;
+  const hasDateRange = params?.startAt !== undefined || params?.endAt !== undefined;
 
   if (websiteId) {
-    await setWebsiteDate(websiteId, dateRange);
+    const datePromise = hasDateRange ? setWebsiteDate(websiteId, dateRange) : Promise.resolve();
+    const segmentPromise = params.segment
+      ? getWebsiteSegment(websiteId, params.segment)
+      : Promise.resolve(null);
+    const cohortPromise = params.cohort
+      ? getWebsiteSegment(websiteId, params.cohort)
+      : Promise.resolve(null);
+
+    await datePromise;
 
     if (params.segment) {
-      const segmentParams = (await getWebsiteSegment(websiteId, params.segment))
-        ?.parameters as Record<string, any>;
-
+      const segmentParams = (await segmentPromise)?.parameters as Record<string, any>;
       Object.assign(filters, filtersArrayToObject(segmentParams.filters));
 
       if (segmentParams.match) {
@@ -132,9 +139,7 @@ export async function getQueryFilters(
     }
 
     if (params.cohort) {
-      const cohortParams = (await getWebsiteSegment(websiteId, params.cohort))
-        ?.parameters as Record<string, any>;
-
+      const cohortParams = (await cohortPromise)?.parameters as Record<string, any>;
       const { startDate, endDate } = parseDateRange(cohortParams.dateRange);
 
       const cohortFilters = cohortParams.filters.map(({ name, ...props }) => ({

@@ -259,7 +259,6 @@ async function rawQuery(sql: string, data: Record<string, any>, name?: string): 
     log('NAME:\n', name);
   }
   const params = [];
-  const schema = getSchema();
 
   if (schema) {
     await client.$executeRawUnsafe(`SET search_path TO "${schema}";`);
@@ -285,21 +284,22 @@ async function pagedQuery<T>(model: string, criteria: T, filters?: QueryFilters)
   const { page = 1, pageSize, orderBy, sortDescending = false, search } = filters || {};
   const size = +pageSize || DEFAULT_PAGE_SIZE;
 
-  const data = await client[model].findMany({
-    ...criteria,
-    ...{
-      ...(size > 0 && { take: +size, skip: +size * (+page - 1) }),
-      ...(orderBy && {
-        orderBy: [
-          {
-            [orderBy]: sortDescending ? 'desc' : 'asc',
-          },
-        ],
-      }),
-    },
-  });
-
-  const count = await client[model].count({ where: (criteria as any).where });
+  const [data, count] = await Promise.all([
+    client[model].findMany({
+      ...criteria,
+      ...{
+        ...(size > 0 && { take: +size, skip: +size * (+page - 1) }),
+        ...(orderBy && {
+          orderBy: [
+            {
+              [orderBy]: sortDescending ? 'desc' : 'asc',
+            },
+          ],
+        }),
+      },
+    }),
+    client[model].count({ where: (criteria as any).where }),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy, search };
 }
@@ -322,11 +322,10 @@ async function pagedRawQuery(
     .filter(n => n)
     .join('\n');
 
-  const count = await rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(
-    res => res[0].num,
-  );
-
-  const data = await rawQuery(`${query}${statements}`, queryParams, name);
+  const [data, count] = await Promise.all([
+    rawQuery(`${query}${statements}`, queryParams, name),
+    rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(res => res[0].num),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy };
 }
@@ -367,11 +366,12 @@ function getSchema() {
   return connectionUrl.searchParams.get('schema');
 }
 
+const schema = getSchema();
+
 function getClient() {
   const url = process.env.DATABASE_URL;
   const replicaUrl = process.env.DATABASE_REPLICA_URL;
   const logQuery = process.env.LOG_QUERY;
-  const schema = getSchema();
 
   const baseAdapter = new PrismaPg({ connectionString: url }, { schema });
 

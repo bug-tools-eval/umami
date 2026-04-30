@@ -1,15 +1,13 @@
 import { FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
-import type { Filter, QueryFilters, QueryOptions } from '@/lib/types';
+import type { Filter, Operator, QueryFilters, QueryOptions } from '@/lib/types';
+
+const OPERATOR_REGEX = new RegExp(`^(${Object.values(OPERATORS).join('|')})\\.(.*)$`);
 
 export function parseFilterValue(param: any) {
   if (typeof param === 'string') {
-    const operatorValues = Object.values(OPERATORS).join('|');
+    const [, operator, value] = param.match(OPERATOR_REGEX) || [];
 
-    const regex = new RegExp(`^(${operatorValues})\\.(.*)$`);
-
-    const [, operator, value] = param.match(regex) || [];
-
-    const resolvedOperator = operator || OPERATORS.equals;
+    const resolvedOperator = (operator || OPERATORS.equals) as Operator;
     const resolvedValue = value ?? param;
 
     if (resolvedOperator === OPERATORS.equals || resolvedOperator === OPERATORS.notEquals) {
@@ -44,27 +42,30 @@ export function filtersObjectToArray(filters: QueryFilters, options: QueryOption
     return [];
   }
 
-  return Object.keys(filters).reduce((arr, key) => {
+  const arr: Filter[] = [];
+
+  for (const key of Object.keys(filters)) {
     const filter = filters[key];
 
     if (filter === undefined || filter === null) {
-      return arr;
+      continue;
     }
 
     const baseName = key.replace(/\d+$/, '');
     const paramName = key !== baseName ? key : undefined;
 
     if (filter?.name && filter?.value !== undefined) {
-      return arr.concat({
+      arr.push({
         ...filter,
         column: options?.columns?.[baseName] ?? FILTER_COLUMNS[baseName],
         paramName: paramName ?? filter.paramName,
       });
+      continue;
     }
 
     const { operator, value } = parseFilterValue(filter);
 
-    return arr.concat({
+    arr.push({
       name: baseName,
       paramName,
       column: options?.columns?.[baseName] ?? FILTER_COLUMNS[baseName],
@@ -72,7 +73,9 @@ export function filtersObjectToArray(filters: QueryFilters, options: QueryOption
       value,
       prefix: options?.prefix,
     });
-  }, []);
+  }
+
+  return arr;
 }
 
 export function filtersArrayToObject(filters: Filter[]) {

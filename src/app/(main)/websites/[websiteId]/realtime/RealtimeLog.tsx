@@ -1,5 +1,4 @@
 import { Column, Heading, Row, SearchField, Text } from '@umami/react-zen';
-import Link from '@/components/common/Link';
 import { useMemo, useState } from 'react';
 import { FixedSizeList } from 'react-window';
 import { SessionModal } from '@/app/(main)/websites/[websiteId]/sessions/SessionModal';
@@ -7,6 +6,7 @@ import { useFormat } from '@/components//hooks/useFormat';
 import { Avatar } from '@/components/common/Avatar';
 import { Empty } from '@/components/common/Empty';
 import { IconLabel } from '@/components/common/IconLabel';
+import Link from '@/components/common/Link';
 import {
   useCountryNames,
   useLocale,
@@ -43,6 +43,7 @@ export function RealtimeLog({ data }: { data: any }) {
   const [filter, setFilter] = useState(TYPE_ALL);
   const { updateParams } = useNavigation();
   const { isPhone } = useMobile();
+  const searchTerm = useMemo(() => search.toLowerCase(), [search]);
 
   const buttons = [
     {
@@ -149,20 +150,16 @@ export function RealtimeLog({ data }: { data: any }) {
 
     let logs = data.events;
 
-    if (search) {
+    if (searchTerm) {
       logs = logs.filter(({ eventName, urlPath, browser, os, country, device }) => {
-        return [
-          eventName,
-          urlPath,
-          os,
-          formatValue(browser, 'browser'),
-          formatValue(country, 'country'),
-          formatValue(device, 'device'),
-        ]
-          .filter(n => n)
-          .map(n => n.toLowerCase())
-          .join('')
-          .includes(search.toLowerCase());
+        return (
+          includesSearch(eventName, searchTerm) ||
+          includesSearch(urlPath, searchTerm) ||
+          includesSearch(os, searchTerm) ||
+          includesSearch(formatValue(browser, 'browser'), searchTerm) ||
+          includesSearch(formatValue(country, 'country'), searchTerm) ||
+          includesSearch(formatValue(device, 'device'), searchTerm)
+        );
       });
     }
 
@@ -171,7 +168,7 @@ export function RealtimeLog({ data }: { data: any }) {
     }
 
     return logs;
-  }, [data, filter, formatValue, search]);
+  }, [data, filter, formatValue, searchTerm]);
 
   return (
     <Column gap>
@@ -203,4 +200,8 @@ export function RealtimeLog({ data }: { data: any }) {
       <SessionModal websiteId={website.id} />
     </Column>
   );
+}
+
+function includesSearch(value: string, search: string) {
+  return value?.toLowerCase().includes(search);
 }

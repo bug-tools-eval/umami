@@ -1,5 +1,5 @@
 import { Button, Column, DataColumn, DataTable, Icon, Row, SearchField } from '@umami/react-zen';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { LoadingPanel } from '@/components/common/LoadingPanel';
 import { useMessages, useWebsiteExpandedMetricsQuery } from '@/components/hooks';
 import { X } from '@/components/icons';
@@ -43,7 +43,10 @@ export function MetricsExpandedTable({
     ...params,
   });
 
-  const items = data?.map(({ name, ...props }) => ({ label: name, ...props }));
+  const items = useMemo(
+    () => data?.map(({ name, ...props }) => ({ label: name, ...props })),
+    [data],
+  );
 
   return (
     <>

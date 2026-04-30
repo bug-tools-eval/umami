@@ -63,6 +63,11 @@ import { record } from 'rrweb';
   };
 
   const flush = (useKeepalive = false) => {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+
     if (!eventBuffer.length) return;
 
     const events = eventBuffer;
@@ -72,14 +77,17 @@ import { record } from 'rrweb';
   };
 
   const scheduleFlush = () => {
-    if (flushTimer) clearTimeout(flushTimer);
-    flushTimer = setTimeout(flush, FLUSH_INTERVAL);
+    if (!flushTimer) {
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flush();
+      }, FLUSH_INTERVAL);
+    }
   };
 
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    if (flushTimer) clearTimeout(flushTimer);
     flush();
     if (stopFn) stopFn();
   };
