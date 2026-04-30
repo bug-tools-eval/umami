@@ -29,33 +29,25 @@ export function useTimezone() {
   };
 
   const formatSeriesTimezone = (data: any, column: string, timezone: string) => {
+    const format = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
     return data.map(item => {
-      const date = new Date(item[column]);
-
-      const format = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        hour12: false,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-
-      const parts = format.formatToParts(date);
-      const get = type => parts.find(p => p.type === type)?.value;
-
-      const year = get('year');
-      const month = get('month');
-      const day = get('day');
-      const hour = get('hour');
-      const minute = get('minute');
-      const second = get('second');
+      const parts = format.formatToParts(new Date(item[column]));
+      const lookup: Record<string, string> = {};
+      for (const p of parts) lookup[p.type] = p.value;
 
       return {
         ...item,
-        [column]: `${year}-${month}-${day} ${hour}:${minute}:${second}`,
+        [column]: `${lookup.year}-${lookup.month}-${lookup.day} ${lookup.hour}:${lookup.minute}:${lookup.second}`,
       };
     });
   };

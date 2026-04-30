@@ -9,17 +9,24 @@ export async function findWebsite(criteria: Prisma.WebsiteFindUniqueArgs) {
 }
 
 export async function getWebsite(websiteId: string) {
-  const website = await findWebsite({
-    where: {
-      id: websiteId,
-    },
-  });
+  const [website, share] = await Promise.all([
+    findWebsite({
+      where: {
+        id: websiteId,
+      },
+    }),
+    prisma.client.share.findFirst({
+      where: { entityId: websiteId },
+      orderBy: { createdAt: 'desc' },
+      select: { slug: true },
+    }),
+  ]);
 
   if (!website) {
     return null;
   }
 
-  return attachShareIdToWebsite(website);
+  return { ...website, shareId: share?.slug ?? null };
 }
 
 export async function getWebsites(criteria: Prisma.WebsiteFindManyArgs, filters: QueryFilters) {
