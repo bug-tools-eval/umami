@@ -21,7 +21,7 @@ export interface WorldMapProps extends ColumnProps {
 export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
   const [tooltip, setTooltipPopup] = useState();
   const { theme } = useTheme();
-  const { colors } = getThemeColors(theme);
+  const { colors } = useMemo(() => getThemeColors(theme), [theme]);
   const { locale } = useLocale();
   const { t, labels } = useMessages();
   const { countryNames } = useCountryNames(locale);
@@ -37,9 +37,15 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
     [data, mapData],
   );
 
+  const metricsByCode = useMemo(() => {
+    const map = new Map<string, { x: string; y: number; z: number }>();
+    for (const m of metrics ?? []) map.set(m.x, m);
+    return map;
+  }, [metrics]);
+
   const getFillColor = (code: string) => {
     if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
+    const country = metricsByCode.get(code);
 
     if (!country) {
       return colors.map.fillColor;
@@ -56,7 +62,7 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
 
   const handleHover = (code: string) => {
     if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
+    const country = metricsByCode.get(code);
     setTooltipPopup(
       `${countryNames[code] || unknownLabel}: ${formatLongNumber(
         country?.y || 0,
