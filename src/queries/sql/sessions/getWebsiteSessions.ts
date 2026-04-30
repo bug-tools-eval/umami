@@ -1,5 +1,5 @@
 import clickhouse from '@/lib/clickhouse';
-import { EVENT_COLUMNS } from '@/lib/constants';
+import { DEFAULT_PAGE_SIZE, EVENT_COLUMNS } from '@/lib/constants';
 import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
 import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
@@ -14,13 +14,15 @@ export async function getWebsiteSessions(...args: [websiteId: string, filters: Q
 }
 
 async function relationalQuery(websiteId: string, filters: QueryFilters) {
-  const { pagedRawQuery, parseFilters } = prisma;
-  const { search } = filters;
-  const { filterQuery, dateQuery, cohortQuery, queryParams } = parseFilters({
+  const { rawQuery, parseFilters } = prisma;
+  const { page = 1, pageSize, search } = filters;
+  const { filterQuery, dateQuery, cohortQuery, joinSessionQuery, queryParams } = parseFilters({
     ...filters,
     websiteId,
     search: search ? `%${search}%` : undefined,
   });
+  const size = +pageSize || DEFAULT_PAGE_SIZE;
+  const offset = +size * (+page - 1);
 
   const searchQuery = search
     ? `and (distinct_id ilike {{search}}
@@ -30,12 +32,53 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
            or device ilike {{search}})`
     : '';
 
-  return pagedRawQuery(
+  const sessionJoinQuery =
+    joinSessionQuery ||
+    (search
+      ? `join session on session.session_id = website_event.session_id
+      and session.website_id = website_event.website_id`
+      : '');
+
+  const count = await rawQuery(
     `
+    select count(*) as num
+    from (
+      select website_event.session_id, website_event.hostname
+      from website_event
+      ${cohortQuery}
+      ${sessionJoinQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+      ${dateQuery}
+      ${filterQuery}
+      ${searchQuery}
+      group by website_event.session_id, website_event.hostname
+    ) as t
+    `,
+    queryParams,
+  ).then(result => result?.[0]?.num);
+
+  const data = await rawQuery(
+    `
+    with page_sessions as (
+      select
+        website_event.session_id,
+        website_event.hostname,
+        max(website_event.created_at) as "createdAt"
+      from website_event
+      ${cohortQuery}
+      ${sessionJoinQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+      ${dateQuery}
+      ${filterQuery}
+      ${searchQuery}
+      group by website_event.session_id, website_event.hostname
+      order by max(website_event.created_at) desc
+      limit ${size} offset ${offset}
+    )
     select
       session.session_id as "id",
       session.website_id as "websiteId",
-      website_event.hostname,
+      page_sessions.hostname,
       session.browser,
       session.os,
       session.device,
@@ -50,17 +93,16 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
       sum(case when website_event.event_type = 1 then 1 else 0 end) as "views",
       sum(case when website_event.event_type = 2 then 1 else 0 end) as "events",
       max(website_event.created_at) as "createdAt"
-    from website_event 
-    ${cohortQuery}
+    from page_sessions
+    join website_event on website_event.website_id = {{websiteId::uuid}}
+      and website_event.session_id = page_sessions.session_id
+      and website_event.created_at between {{startDate}} and {{endDate}}
+      and website_event.hostname is not distinct from page_sessions.hostname
     join session on session.session_id = website_event.session_id
       and session.website_id = website_event.website_id
-    where website_event.website_id = {{websiteId::uuid}}
-    ${dateQuery}
-    ${filterQuery}
-    ${searchQuery}
     group by session.session_id, 
       session.website_id, 
-      website_event.hostname, 
+      page_sessions.hostname,
       session.browser, 
       session.os, 
       session.device, 
@@ -72,9 +114,10 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
     order by max(website_event.created_at) desc
     `,
     queryParams,
-    filters,
     FUNCTION_NAME,
   );
+
+  return { data, count, page: +page, pageSize: size };
 }
 
 async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
