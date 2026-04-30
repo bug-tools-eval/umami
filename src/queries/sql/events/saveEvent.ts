@@ -141,29 +141,37 @@ async function relationalQuery({
   });
 
   if (eventData) {
-    await saveEventData({
-      websiteId,
-      sessionId,
-      eventId: websiteEventId,
-      urlPath: urlPath?.substring(0, URL_LENGTH),
-      eventName: eventName?.substring(0, EVENT_NAME_LENGTH),
-      eventData,
-      createdAt,
-    });
-
+    const truncatedEventName = eventName?.substring(0, EVENT_NAME_LENGTH);
+    const truncatedUrlPath = urlPath?.substring(0, URL_LENGTH);
     const { revenue, currency } = eventData;
 
-    if (revenue > 0 && currency) {
-      await saveRevenue({
+    const tasks: Promise<unknown>[] = [
+      saveEventData({
         websiteId,
         sessionId,
         eventId: websiteEventId,
-        eventName: eventName?.substring(0, EVENT_NAME_LENGTH),
-        currency,
-        revenue,
+        urlPath: truncatedUrlPath,
+        eventName: truncatedEventName,
+        eventData,
         createdAt,
-      });
+      }),
+    ];
+
+    if (revenue > 0 && currency) {
+      tasks.push(
+        saveRevenue({
+          websiteId,
+          sessionId,
+          eventId: websiteEventId,
+          eventName: truncatedEventName,
+          currency,
+          revenue,
+          createdAt,
+        }),
+      );
     }
+
+    await Promise.all(tasks);
   }
 }
 

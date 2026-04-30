@@ -137,33 +137,58 @@ export async function getClientInfo(request: Request, payload: Record<string, an
   return { userAgent, browser, os, ip, country, region, city, device };
 }
 
-export function hasBlockedIp(clientIp: string) {
+type BlockedEntry = { exact: string } | { cidr: ReturnType<typeof ipaddr.parseCIDR> };
+
+let blockedIpCache: { source: string; entries: BlockedEntry[] } | null = null;
+
+function getBlockedIpEntries(): BlockedEntry[] | null {
   const ignoreIps = process.env.IGNORE_IP;
+  if (!ignoreIps) return null;
 
-  if (ignoreIps) {
-    const ips = [];
+  if (blockedIpCache?.source === ignoreIps) {
+    return blockedIpCache.entries;
+  }
 
-    if (ignoreIps) {
-      ips.push(...ignoreIps.split(',').map(n => n.trim()));
-    }
-
-    return ips.find(ip => {
-      if (ip === clientIp) {
-        return true;
+  const entries: BlockedEntry[] = [];
+  for (const raw of ignoreIps.split(',')) {
+    const ip = raw.trim();
+    if (!ip) continue;
+    if (ip.indexOf('/') > 0) {
+      try {
+        entries.push({ cidr: ipaddr.parseCIDR(ip) });
+      } catch {
+        entries.push({ exact: ip });
       }
+    } else {
+      entries.push({ exact: ip });
+    }
+  }
 
-      // CIDR notation
-      if (ip.indexOf('/') > 0) {
-        const addr = ipaddr.parse(clientIp);
-        const range = ipaddr.parseCIDR(ip);
+  blockedIpCache = { source: ignoreIps, entries };
+  return entries;
+}
 
-        if (addr.kind() === range[0].kind() && addr.match(range)) {
-          return true;
+export function hasBlockedIp(clientIp: string) {
+  const entries = getBlockedIpEntries();
+  if (!entries) return false;
+
+  let parsedClient: ReturnType<typeof ipaddr.parse> | null = null;
+
+  for (const entry of entries) {
+    if ('exact' in entry) {
+      if (entry.exact === clientIp) return true;
+    } else {
+      if (!parsedClient) {
+        try {
+          parsedClient = ipaddr.parse(clientIp);
+        } catch {
+          return false;
         }
       }
-
-      return false;
-    });
+      if (parsedClient.kind() === entry.cidr[0].kind() && parsedClient.match(entry.cidr)) {
+        return true;
+      }
+    }
   }
 
   return false;
