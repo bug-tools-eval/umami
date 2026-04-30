@@ -1,4 +1,4 @@
-import { isBefore, startOfMinute, subMinutes } from 'date-fns';
+import { startOfMinute, subMinutes } from 'date-fns';
 import { useMemo, useRef } from 'react';
 import { useTimezone } from '@/components/hooks';
 import { DEFAULT_ANIMATION_DURATION, REALTIME_RANGE } from '@/lib/constants';
@@ -13,10 +13,16 @@ export interface RealtimeChartProps {
 
 export function RealtimeChart({ data, unit, ...props }: RealtimeChartProps) {
   const { formatSeriesTimezone, fromUtc, timezone } = useTimezone();
-  const endDate = startOfMinute(new Date());
-  const startDate = subMinutes(endDate, REALTIME_RANGE);
-  const prevEndDate = useRef(endDate);
-  const prevData = useRef<string | null>(null);
+  const endTime = startOfMinute(new Date()).getTime();
+  const { startDate, endDate } = useMemo(
+    () => ({
+      endDate: new Date(endTime),
+      startDate: subMinutes(new Date(endTime), REALTIME_RANGE),
+    }),
+    [endTime],
+  );
+  const prevEndTime = useRef(endTime);
+  const prevChartData = useRef<{ pageviews: any[]; sessions: any[] } | null>(null);
 
   const chartData = useMemo(() => {
     if (!data) {
@@ -27,24 +33,23 @@ export function RealtimeChart({ data, unit, ...props }: RealtimeChartProps) {
       pageviews: formatSeriesTimezone(data.series.views, 'x', timezone),
       sessions: formatSeriesTimezone(data.series.visitors, 'x', timezone),
     };
-  }, [data, startDate, endDate, unit]);
+  }, [data, startDate, endDate, unit, timezone]);
 
   const animationDuration = useMemo(() => {
     // Don't animate the bars shifting over because it looks weird
-    if (isBefore(prevEndDate.current, endDate)) {
-      prevEndDate.current = endDate;
+    if (prevEndTime.current < endTime) {
+      prevEndTime.current = endTime;
       return 0;
     }
 
     // Don't animate when data hasn't changed
-    const serialized = JSON.stringify(chartData);
-    if (prevData.current === serialized) {
+    if (prevChartData.current === chartData) {
       return 0;
     }
-    prevData.current = serialized;
+    prevChartData.current = chartData;
 
     return DEFAULT_ANIMATION_DURATION;
-  }, [endDate, chartData]);
+  }, [endTime, chartData]);
 
   return (
     <PageviewsChart
