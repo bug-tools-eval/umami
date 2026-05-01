@@ -118,11 +118,17 @@ export async function getQueryFilters(
   let match = params?.match;
 
   if (websiteId) {
-    await setWebsiteDate(websiteId, dateRange);
+    // setWebsiteDate, segment lookup, and cohort lookup are independent —
+    // run them in parallel (each is at least one round trip to the DB or
+    // Redis) and merge the results once they all resolve.
+    const [, segment, cohort] = await Promise.all([
+      setWebsiteDate(websiteId, dateRange),
+      params.segment ? getWebsiteSegment(websiteId, params.segment) : null,
+      params.cohort ? getWebsiteSegment(websiteId, params.cohort) : null,
+    ]);
 
-    if (params.segment) {
-      const segmentParams = (await getWebsiteSegment(websiteId, params.segment))
-        ?.parameters as Record<string, any>;
+    if (segment) {
+      const segmentParams = segment.parameters as Record<string, any>;
 
       Object.assign(filters, filtersArrayToObject(segmentParams.filters));
 
@@ -131,9 +137,8 @@ export async function getQueryFilters(
       }
     }
 
-    if (params.cohort) {
-      const cohortParams = (await getWebsiteSegment(websiteId, params.cohort))
-        ?.parameters as Record<string, any>;
+    if (cohort) {
+      const cohortParams = cohort.parameters as Record<string, any>;
 
       const { startDate, endDate } = parseDateRange(cohortParams.dateRange);
 
