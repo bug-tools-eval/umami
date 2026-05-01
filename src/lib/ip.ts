@@ -1,5 +1,7 @@
 import ipaddr from 'ipaddr.js';
 
+const FORWARDED_FOR_RE = /for=(\[?[0-9a-fA-F:.]+]?)/;
+
 export const IP_ADDRESS_HEADERS = [
   ...(process.env.CLOUD_MODE ? ['x-umami-client-ip'] : []), // Umami custom header (cloud mode only)
   'true-client-ip', // CDN
@@ -66,30 +68,29 @@ function resolveIp(ip?: string | null) {
 export function getIpAddress(headers: Headers) {
   const customHeader = process.env.CLIENT_IP_HEADER;
 
-  if (customHeader && headers.get(customHeader)) {
-    return resolveIp(headers.get(customHeader));
+  if (customHeader) {
+    const value = headers.get(customHeader);
+    if (value) return resolveIp(value);
   }
 
-  const header = IP_ADDRESS_HEADERS.find(name => headers.get(name));
-  if (!header) {
-    return undefined;
-  }
+  for (const name of IP_ADDRESS_HEADERS) {
+    const ip = headers.get(name);
+    if (!ip) continue;
 
-  const ip = headers.get(header);
-
-  if (header === 'x-forwarded-for') {
-    return resolveIp(ip?.split(',')?.[0]?.trim());
-  }
-
-  if (header === 'forwarded') {
-    const match = ip.match(/for=(\[?[0-9a-fA-F:.]+]?)/);
-
-    if (match) {
-      return resolveIp(match[1]);
+    if (name === 'x-forwarded-for') {
+      return resolveIp(ip.split(',')[0]?.trim());
     }
+
+    if (name === 'forwarded') {
+      const match = ip.match(FORWARDED_FOR_RE);
+      if (match) return resolveIp(match[1]);
+      continue;
+    }
+
+    return resolveIp(ip);
   }
 
-  return resolveIp(ip);
+  return undefined;
 }
 
 export function stripPort(ip?: string | null) {

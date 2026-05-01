@@ -127,8 +127,10 @@ export function getTimezone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+const DATE_VALUE_RE = /^(?<num>[0-9-]+)(?<unit>hour|day|week|month|year)$/;
+
 export function parseDateValue(value: string) {
-  const match = value.match?.(/^(?<num>[0-9-]+)(?<unit>hour|day|week|month|year)$/);
+  const match = value.match?.(DATE_VALUE_RE);
 
   if (!match) return null;
 
