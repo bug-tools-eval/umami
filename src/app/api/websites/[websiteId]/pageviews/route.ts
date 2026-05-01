@@ -27,11 +27,6 @@ export async function GET(
 
   const filters = await getQueryFilters(query, websiteId);
 
-  const [pageviews, sessions] = await Promise.all([
-    getPageviewStats(websiteId, filters),
-    getSessionStats(websiteId, filters),
-  ]);
-
   if (filters.compare) {
     const { startDate: compareStartDate, endDate: compareEndDate } = getCompareDate(
       filters.compare,
@@ -39,17 +34,17 @@ export async function GET(
       filters.endDate,
     );
 
-    const [comparePageviews, compareSessions] = await Promise.all([
-      getPageviewStats(websiteId, {
-        ...filters,
-        startDate: compareStartDate,
-        endDate: compareEndDate,
-      }),
-      getSessionStats(websiteId, {
-        ...filters,
-        startDate: compareStartDate,
-        endDate: compareEndDate,
-      }),
+    const compareFilters = {
+      ...filters,
+      startDate: compareStartDate,
+      endDate: compareEndDate,
+    };
+
+    const [pageviews, sessions, comparePageviews, compareSessions] = await Promise.all([
+      getPageviewStats(websiteId, filters),
+      getSessionStats(websiteId, filters),
+      getPageviewStats(websiteId, compareFilters),
+      getSessionStats(websiteId, compareFilters),
     ]);
 
     return json({
@@ -65,6 +60,11 @@ export async function GET(
       },
     });
   }
+
+  const [pageviews, sessions] = await Promise.all([
+    getPageviewStats(websiteId, filters),
+    getSessionStats(websiteId, filters),
+  ]);
 
   return json({ pageviews, sessions });
 }

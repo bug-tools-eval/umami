@@ -11,10 +11,9 @@ export async function POST(request: Request) {
   }
 
   const user = { ...auth.user };
-  const teams = await getAllUserTeams(user.id);
 
   if (process.env.CLOUD_MODE) {
-    const account = await fetchAccount(user.id);
+    const [teams, account] = await Promise.all([getAllUserTeams(user.id), fetchAccount(user.id)]);
 
     if (account) {
       user.subscription = {
@@ -44,6 +43,8 @@ export async function POST(request: Request) {
 
     return json({ ...user, teams: teamsWithSubscription });
   }
+
+  const teams = await getAllUserTeams(user.id);
 
   return json({ ...user, teams });
 }
