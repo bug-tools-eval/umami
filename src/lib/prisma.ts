@@ -9,6 +9,10 @@ import type { Operator, QueryFilters, QueryOptions } from './types';
 const log = debug('umami:prisma');
 
 const PRISMA = 'prisma';
+const SESSION_COLUMN_SET = new Set(SESSION_COLUMNS);
+const SESSION_FILTER_SET = new Set(['referrer', ...SESSION_COLUMNS]);
+const CONTAINS_OPERATORS = new Set<Operator>([OPERATORS.contains, OPERATORS.doesNotContain]);
+const EQUALITY_OPERATORS = new Set<Operator>([OPERATORS.equals, OPERATORS.notEquals]);
 
 const PRISMA_LOG_OPTIONS = {
   log: [
@@ -85,7 +89,7 @@ function mapFilter(
     name = name.slice('cohort_'.length);
   }
 
-  const table = SESSION_COLUMNS.includes(name) ? 'session' : 'website_event';
+  const table = SESSION_COLUMN_SET.has(name) ? 'session' : 'website_event';
 
   switch (operator) {
     case OPERATORS.equals:
@@ -216,9 +220,9 @@ function getQueryParams(filters: Record<string, any>) {
 
       const key = paramName ?? name;
 
-      if (([OPERATORS.contains, OPERATORS.doesNotContain] as Operator[]).includes(operator)) {
+      if (CONTAINS_OPERATORS.has(operator)) {
         obj[key] = `%${value}%`;
-      } else if (([OPERATORS.equals, OPERATORS.notEquals] as Operator[]).includes(operator)) {
+      } else if (EQUALITY_OPERATORS.has(operator)) {
         obj[key] = Array.isArray(value) ? value : [value];
       } else {
         obj[key] = value;
@@ -230,14 +234,20 @@ function getQueryParams(filters: Record<string, any>) {
 }
 
 function parseFilters(filters: Record<string, any>, options?: QueryOptions) {
-  const joinSession = Object.keys(filters).find(key => {
-    const baseName = key.replace(/\d+$/, '');
-    return ['referrer', ...SESSION_COLUMNS].includes(baseName);
-  });
+  let joinSession = false;
+  const cohortFilters: Record<string, any> = {};
 
-  const cohortFilters = Object.fromEntries(
-    Object.entries(filters).filter(([key]) => key.startsWith('cohort_')),
-  );
+  for (const key of Object.keys(filters)) {
+    const baseName = key.replace(/\d+$/, '');
+
+    if (!joinSession && SESSION_FILTER_SET.has(baseName)) {
+      joinSession = true;
+    }
+
+    if (key.startsWith('cohort_')) {
+      cohortFilters[key] = filters[key];
+    }
+  }
 
   return {
     joinSessionQuery:
@@ -259,7 +269,6 @@ async function rawQuery(sql: string, data: Record<string, any>, name?: string): 
     log('NAME:\n', name);
   }
   const params = [];
-  const schema = getSchema();
 
   if (schema) {
     await client.$executeRawUnsafe(`SET search_path TO "${schema}";`);
@@ -285,21 +294,22 @@ async function pagedQuery<T>(model: string, criteria: T, filters?: QueryFilters)
   const { page = 1, pageSize, orderBy, sortDescending = false, search } = filters || {};
   const size = +pageSize || DEFAULT_PAGE_SIZE;
 
-  const data = await client[model].findMany({
-    ...criteria,
-    ...{
-      ...(size > 0 && { take: +size, skip: +size * (+page - 1) }),
-      ...(orderBy && {
-        orderBy: [
-          {
-            [orderBy]: sortDescending ? 'desc' : 'asc',
-          },
-        ],
-      }),
-    },
-  });
-
-  const count = await client[model].count({ where: (criteria as any).where });
+  const [data, count] = await Promise.all([
+    client[model].findMany({
+      ...criteria,
+      ...{
+        ...(size > 0 && { take: +size, skip: +size * (+page - 1) }),
+        ...(orderBy && {
+          orderBy: [
+            {
+              [orderBy]: sortDescending ? 'desc' : 'asc',
+            },
+          ],
+        }),
+      },
+    }),
+    client[model].count({ where: (criteria as any).where }),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy, search };
 }
@@ -322,11 +332,10 @@ async function pagedRawQuery(
     .filter(n => n)
     .join('\n');
 
-  const count = await rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(
-    res => res[0].num,
-  );
-
-  const data = await rawQuery(`${query}${statements}`, queryParams, name);
+  const [data, count] = await Promise.all([
+    rawQuery(`${query}${statements}`, queryParams, name),
+    rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(res => res[0].num),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy };
 }
@@ -367,11 +376,12 @@ function getSchema() {
   return connectionUrl.searchParams.get('schema');
 }
 
+const schema = getSchema();
+
 function getClient() {
   const url = process.env.DATABASE_URL;
   const replicaUrl = process.env.DATABASE_REPLICA_URL;
   const logQuery = process.env.LOG_QUERY;
-  const schema = getSchema();
 
   const baseAdapter = new PrismaPg({ connectionString: url }, { schema });
 

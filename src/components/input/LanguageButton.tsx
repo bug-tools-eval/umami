@@ -3,9 +3,10 @@ import { Globe } from 'lucide-react';
 import { useLocale } from '@/components/hooks';
 import { languages } from '@/lib/lang';
 
+const LANGUAGE_ITEMS = Object.keys(languages).map(key => ({ ...languages[key], value: key }));
+
 export function LanguageButton() {
   const { locale, saveLocale } = useLocale();
-  const items = Object.keys(languages).map(key => ({ ...languages[key], value: key }));
 
   function handleSelect(value: string) {
     saveLocale(value);
@@ -21,7 +22,7 @@ export function LanguageButton() {
       <Popover placement="bottom end">
         <Dialog>
           <Grid columns="repeat(3, minmax(200px, 1fr))" overflow="hidden">
-            {items.map(({ value, label }) => {
+            {LANGUAGE_ITEMS.map(({ value, label }) => {
               return (
                 <Button key={value} variant="quiet" onPress={() => handleSelect(value)}>
                   <Text

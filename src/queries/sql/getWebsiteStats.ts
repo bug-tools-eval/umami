@@ -83,7 +83,7 @@ async function clickhouseQuery(
   const { excludeBounce } = filters;
   const bounceQuery = excludeBounce ? '0' : 'sumIf(1, t.c = 1)';
 
-  if (EVENT_COLUMNS.some(item => Object.keys(filters).includes(item))) {
+  if (EVENT_COLUMNS.some(item => item in filters)) {
     sql = `
     select
       sum(t.c) as "pageviews",

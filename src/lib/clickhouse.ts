@@ -4,7 +4,7 @@ import debug from 'debug';
 import { CLICKHOUSE } from '@/lib/db';
 import { DEFAULT_PAGE_SIZE, FILTER_COLUMNS, OPERATORS } from './constants';
 import { filtersObjectToArray } from './params';
-import type { QueryFilters, QueryOptions } from './types';
+import type { Operator, QueryFilters, QueryOptions } from './types';
 
 export const CLICKHOUSE_DATE_FORMATS = {
   utc: '%Y-%m-%dT%H:%i:%SZ',
@@ -20,6 +20,7 @@ const log = debug('umami:clickhouse');
 
 let clickhouse: ClickHouseClient;
 const enabled = Boolean(process.env.CLICKHOUSE_URL);
+const EQUALITY_OPERATORS = new Set<Operator>([OPERATORS.equals, OPERATORS.notEquals]);
 
 function getClient() {
   const {
@@ -210,7 +211,7 @@ function getQueryParams(filters: Record<string, any>) {
 
       const key = paramName ?? name;
 
-      obj[key] = ([OPERATORS.equals, OPERATORS.notEquals] as string[]).includes(operator)
+      obj[key] = EQUALITY_OPERATORS.has(operator)
         ? Array.isArray(value)
           ? value
           : [value]
@@ -222,9 +223,13 @@ function getQueryParams(filters: Record<string, any>) {
 }
 
 function parseFilters(filters: Record<string, any>, options?: QueryOptions) {
-  const cohortFilters = Object.fromEntries(
-    Object.entries(filters).filter(([key]) => key.startsWith('cohort_')),
-  );
+  const cohortFilters: Record<string, any> = {};
+
+  for (const key of Object.keys(filters)) {
+    if (key.startsWith('cohort_')) {
+      cohortFilters[key] = filters[key];
+    }
+  }
 
   return {
     filterQuery: getFilterQuery(filters, options),
@@ -253,11 +258,10 @@ async function pagedRawQuery(
     .filter(n => n)
     .join('\n');
 
-  const count = await rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(
-    res => res[0].num,
-  );
-
-  const data = await rawQuery(`${query}${statements}`, queryParams, name);
+  const [data, count] = await Promise.all([
+    rawQuery(`${query}${statements}`, queryParams, name),
+    rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(res => res[0].num),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy, search };
 }

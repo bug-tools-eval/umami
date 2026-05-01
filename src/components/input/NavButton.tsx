@@ -13,7 +13,7 @@ import {
   Text,
 } from '@umami/react-zen';
 import { ArrowRight } from 'lucide-react';
-import type { Key } from 'react';
+import { type Key, useMemo } from 'react';
 import { IconLabel } from '@/components/common/IconLabel';
 import { useLoginQuery, useMessages, useMobile, useNavigation } from '@/components/hooks';
 import { ChevronRight, User, Users } from '@/components/icons';
@@ -31,8 +31,8 @@ export function NavButton({ showText = true }: TeamsButtonProps) {
   const { t, labels } = useMessages();
   const { teamId, router } = useNavigation();
   const { isMobile } = useMobile();
-  const team = user?.teams?.find(({ id }) => id === teamId);
-  const selectedKeys = new Set([teamId || 'user']);
+  const team = useMemo(() => user?.teams?.find(({ id }) => id === teamId), [teamId, user?.teams]);
+  const selectedKeys = useMemo(() => new Set([teamId || 'user']), [teamId]);
   const label = teamId ? team?.name : user.username;
   const cloudMode = !!process.env.cloudMode;
 

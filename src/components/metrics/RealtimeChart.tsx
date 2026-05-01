@@ -13,8 +13,9 @@ export interface RealtimeChartProps {
 
 export function RealtimeChart({ data, unit, ...props }: RealtimeChartProps) {
   const { formatSeriesTimezone, fromUtc, timezone } = useTimezone();
-  const endDate = startOfMinute(new Date());
-  const startDate = subMinutes(endDate, REALTIME_RANGE);
+  const endTime = +startOfMinute(new Date());
+  const endDate = useMemo(() => new Date(endTime), [endTime]);
+  const startDate = useMemo(() => subMinutes(endDate, REALTIME_RANGE), [endDate]);
   const prevEndDate = useRef(endDate);
   const prevData = useRef<string | null>(null);
 
@@ -27,7 +28,7 @@ export function RealtimeChart({ data, unit, ...props }: RealtimeChartProps) {
       pageviews: formatSeriesTimezone(data.series.views, 'x', timezone),
       sessions: formatSeriesTimezone(data.series.visitors, 'x', timezone),
     };
-  }, [data, startDate, endDate, unit]);
+  }, [data, timezone]);
 
   const animationDuration = useMemo(() => {
     // Don't animate the bars shifting over because it looks weird

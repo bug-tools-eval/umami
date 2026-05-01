@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import thenby from 'thenby';
 import { useMessages, useWebsite } from '@/components/hooks';
 import { ListTable } from '@/components/metrics/ListTable';
@@ -9,25 +10,36 @@ export function RealtimePaths({ data }: { data: any }) {
   const { urls } = data || {};
   const limit = 15;
 
-  const renderLink = ({ label: x }) => {
-    const domain = x.startsWith('/') ? website?.domain : '';
-    return (
-      <a href={`//${domain}${x}`} target="_blank" rel="noreferrer noopener">
-        {x}
-      </a>
-    );
-  };
+  const renderLink = useCallback(
+    ({ label: x }) => {
+      const domain = x.startsWith('/') ? website?.domain : '';
+      return (
+        <a href={`//${domain}${x}`} target="_blank" rel="noreferrer noopener">
+          {x}
+        </a>
+      );
+    },
+    [website?.domain],
+  );
 
-  const pages = percentFilter(
-    Object.keys(urls)
-      .map(key => {
-        return {
-          x: key,
-          y: urls[key],
-        };
-      })
-      .sort(thenby.firstBy('y', -1))
-      .slice(0, limit),
+  const pages = useMemo(
+    () =>
+      percentFilter(
+        Object.keys(urls)
+          .map(key => {
+            return {
+              x: key,
+              y: urls[key],
+            };
+          })
+          .sort(thenby.firstBy('y', -1))
+          .slice(0, limit),
+      ).map(({ x, y, z }: { x: string; y: number; z: number }) => ({
+        label: x,
+        count: y,
+        percent: z,
+      })),
+    [urls],
   );
 
   return (
@@ -35,11 +47,7 @@ export function RealtimePaths({ data }: { data: any }) {
       title={t(labels.pages)}
       metric={t(labels.views)}
       renderLabel={renderLink}
-      data={pages.map(({ x, y, z }: { x: string; y: number; z: number }) => ({
-        label: x,
-        count: y,
-        percent: z,
-      }))}
+      data={pages}
     />
   );
 }

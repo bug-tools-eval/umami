@@ -9,7 +9,7 @@ import {
   Select,
   TextField,
 } from '@umami/react-zen';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Empty } from '@/components/common/Empty';
 import { MultiSelect } from '@/components/common/MultiSelect';
 import { useFilters, useFormat, useWebsiteValuesQuery } from '@/components/hooks';
@@ -54,7 +54,12 @@ export function FilterRecord({
     endDate,
   });
   const isSearch = isSearchOperator(operator);
-  const items = data?.filter(({ value }) => value) || [];
+  const fieldLabel = useMemo(() => fields.find(f => f.name === name)?.label, [fields, name]);
+  const stringOperators = useMemo(
+    () => operators.filter(({ type }) => type === 'string'),
+    [operators],
+  );
+  const items = useMemo(() => data?.filter(({ value }) => value) || [], [data]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -76,17 +81,15 @@ export function FilterRecord({
 
   return (
     <Column>
-      <Label>{fields.find(f => f.name === name)?.label}</Label>
+      <Label>{fieldLabel}</Label>
       <Grid columns="1fr auto" gap>
         <Grid columns={{ base: '1fr', md: '200px 1fr' }} gap>
           <Select value={operator} onChange={handleSelectOperator}>
-            {operators
-              .filter(({ type }) => type === 'string')
-              .map(({ name, label }: any) => (
-                <ListItem key={name} id={name}>
-                  {label}
-                </ListItem>
-              ))}
+            {stringOperators.map(({ name, label }: any) => (
+              <ListItem key={name} id={name}>
+                {label}
+              </ListItem>
+            ))}
           </Select>
           {isSearch && (
             <TextField

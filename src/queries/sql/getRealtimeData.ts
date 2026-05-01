@@ -7,10 +7,13 @@ function increment(data: object, key: string) {
   if (key) {
     if (!data[key]) {
       data[key] = 1;
+      return true;
     } else {
       data[key] += 1;
     }
   }
+
+  return false;
 }
 
 export async function getRealtimeData(websiteId: string, filters: QueryFilters) {
@@ -21,42 +24,36 @@ export async function getRealtimeData(websiteId: string, filters: QueryFilters) 
   ]);
 
   const uniques = new Set();
+  const countries = {};
+  const urls = {};
+  const referrers = {};
+  const events = [];
+  let eventCount = 0;
+  let countryCount = 0;
 
-  const { countries, urls, referrers, events } = activity.reverse().reduce(
-    (
-      obj: { countries: any; urls: any; referrers: any; events: any },
-      event: {
-        sessionId: string;
-        urlPath: string;
-        referrerDomain: string;
-        country: string;
-        eventName: string;
-      },
-    ) => {
-      const { countries, urls, referrers, events } = obj;
-      const { sessionId, urlPath, referrerDomain, country, eventName } = event;
+  for (let index = activity.length - 1; index >= 0; index--) {
+    const event = activity[index];
+    const { sessionId, urlPath, referrerDomain, country, eventName } = event;
 
-      if (!uniques.has(sessionId)) {
-        uniques.add(sessionId);
-        increment(countries, country);
+    if (!uniques.has(sessionId)) {
+      uniques.add(sessionId);
 
-        events.push({ __type: 'session', ...event });
+      if (increment(countries, country)) {
+        countryCount++;
       }
 
-      increment(urls, urlPath);
-      increment(referrers, referrerDomain);
+      events.push({ __type: 'session', ...event });
+    }
 
-      events.push({ __type: eventName ? 'event' : 'pageview', ...event });
+    increment(urls, urlPath);
+    increment(referrers, referrerDomain);
 
-      return obj;
-    },
-    {
-      countries: {},
-      urls: {},
-      referrers: {},
-      events: [],
-    },
-  );
+    if (eventName) {
+      eventCount++;
+    }
+
+    events.push({ __type: eventName ? 'event' : 'pageview', ...event });
+  }
 
   return {
     countries,
@@ -70,8 +67,8 @@ export async function getRealtimeData(websiteId: string, filters: QueryFilters) 
     totals: {
       views: pageviews.reduce((sum: number, { y }: { y: number }) => Number(sum) + Number(y), 0),
       visitors: sessions.reduce((sum: number, { y }: { y: number }) => Number(sum) + Number(y), 0),
-      events: activity.filter(e => e.eventName).length,
-      countries: Object.keys(countries).length,
+      events: eventCount,
+      countries: countryCount,
     },
     timestamp: Date.now(),
   };

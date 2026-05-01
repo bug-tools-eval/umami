@@ -6,6 +6,9 @@ import { canViewWebsite } from '@/permissions';
 import { getWebsiteSegments } from '@/queries/prisma';
 import { getValues } from '@/queries/sql';
 
+const SESSION_COLUMN_SET = new Set(SESSION_COLUMNS);
+const EVENT_COLUMN_SET = new Set(EVENT_COLUMNS);
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ websiteId: string }> },
@@ -29,7 +32,7 @@ export async function GET(
 
   const { type } = query;
 
-  if (!SESSION_COLUMNS.includes(type) && !EVENT_COLUMNS.includes(type) && !SEGMENT_TYPES[type]) {
+  if (!SESSION_COLUMN_SET.has(type) && !EVENT_COLUMN_SET.has(type) && !SEGMENT_TYPES[type]) {
     return badRequest();
   }
 
@@ -44,5 +47,13 @@ export async function GET(
     values = await getValues(websiteId, FILTER_COLUMNS[type], filters);
   }
 
-  return json(values.filter(n => n).sort());
+  const result = [];
+
+  for (const value of values) {
+    if (value) {
+      result.push(value);
+    }
+  }
+
+  return json(result.sort());
 }

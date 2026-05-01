@@ -1,5 +1,5 @@
 import { Column, Grid, Heading, ListItem, Row, Select } from '@umami/react-zen';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DateDisplay } from '@/components/common/DateDisplay';
 import { Panel } from '@/components/common/Panel';
 import { useDateRange, useMessages, useNavigation } from '@/components/hooks';
@@ -22,6 +22,7 @@ export function CompareTables({ websiteId }: { websiteId: string }) {
     startAt: startDate.getTime(),
     endAt: endDate.getTime(),
   };
+  const previousValues = useMemo(() => new Map(data.map(({ x, y }) => [x, y])), [data]);
 
   const renderPath = (view: string) => {
     return updateParams({ view });
@@ -131,7 +132,7 @@ export function CompareTables({ websiteId }: { websiteId: string }) {
   ];
 
   const renderChange = ({ label, count }) => {
-    const prev = data.find(d => d.x === label)?.y;
+    const prev = previousValues.get(label);
     const value = count - prev;
     const change = Math.abs(((count - prev) / prev) * 100);
 

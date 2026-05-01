@@ -291,6 +291,14 @@
 
     // INP - group by interactionId, 98th percentile, 40ms threshold
     let interactions = {};
+    const updateInteractionMetric = () => {
+      const values = Object.values(interactions).sort((a, b) => b - a);
+      if (values.length) {
+        const p98Index = Math.floor(Math.max(values.length, 10) * 0.02);
+        metrics.inp = values[Math.min(p98Index, values.length - 1)];
+      }
+    };
+
     try {
       const observer = new PerformanceObserver(list => {
         list.getEntries().forEach(entry => {
@@ -298,11 +306,6 @@
             const existing = interactions[entry.interactionId];
             if (!existing || entry.duration > existing) {
               interactions[entry.interactionId] = entry.duration;
-            }
-            const values = Object.values(interactions).sort((a, b) => b - a);
-            if (values.length) {
-              const p98Index = Math.floor(Math.max(values.length, 10) * 0.02);
-              metrics.inp = values[Math.min(p98Index, values.length - 1)];
             }
           }
         });
@@ -351,6 +354,7 @@
     const sendPerformance = () => {
       if (sent) return;
 
+      updateInteractionMetric();
       applyFallbackMetrics();
       metrics.duration = Math.round(performance.now() - pageStartTime);
 

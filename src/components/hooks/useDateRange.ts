@@ -6,6 +6,7 @@ import { getCompareDate, getOffsetDateRange, parseDateRange } from '@/lib/date';
 import { getItem } from '@/lib/storage';
 
 export function useDateRange(options: { ignoreOffset?: boolean; timezone?: string } = {}) {
+  const { ignoreOffset = false, timezone } = options;
   const {
     query: { date = '', unit = '', offset = 0, compare = 'prev' },
   } = useNavigation();
@@ -15,15 +16,16 @@ export function useDateRange(options: { ignoreOffset?: boolean; timezone?: strin
       date || getItem(DATE_RANGE_CONFIG) || DEFAULT_DATE_RANGE_VALUE,
       unit,
       locale,
-      options.timezone,
+      timezone,
     );
 
-    return !options.ignoreOffset && offset
-      ? getOffsetDateRange(dateRangeObject, +offset)
-      : dateRangeObject;
-  }, [date, unit, offset, options]);
+    return !ignoreOffset && offset ? getOffsetDateRange(dateRangeObject, +offset) : dateRangeObject;
+  }, [date, ignoreOffset, locale, offset, timezone, unit]);
 
-  const dateCompare = getCompareDate(compare, dateRange.startDate, dateRange.endDate);
+  const dateCompare = useMemo(
+    () => getCompareDate(compare, dateRange.startDate, dateRange.endDate),
+    [compare, dateRange.endDate, dateRange.startDate],
+  );
 
   return {
     date,

@@ -56,7 +56,7 @@ async function clickhouseQuery(
 
   let sql = '';
 
-  if (EVENT_COLUMNS.some(item => Object.keys(filters).includes(item)) || unit === 'minute') {
+  if (EVENT_COLUMNS.some(item => item in filters) || unit === 'minute') {
     sql = `
     select
       g.t as x,

@@ -52,8 +52,12 @@ const schema = z.object({
     })
     .refine(
       data => {
-        const keys = [data.website, data.link, data.pixel];
-        const count = keys.filter(Boolean).length;
+        let count = 0;
+
+        if (data.website) count++;
+        if (data.link) count++;
+        if (data.pixel) count++;
+
         return count === 1;
       },
       {

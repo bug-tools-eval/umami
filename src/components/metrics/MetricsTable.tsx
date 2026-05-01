@@ -58,7 +58,7 @@ export function MetricsTable({
       return items.map(({ x, y, z, ...props }) => ({ label: x, count: y, percent: z, ...props }));
     }
     return [];
-  }, [data, dataFilter, limit, type]);
+  }, [data, dataFilter]);
 
   useEffect(() => {
     if (data) {

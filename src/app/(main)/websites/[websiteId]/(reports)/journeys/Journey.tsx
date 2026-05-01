@@ -52,6 +52,10 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
     const selectedPaths = selectedNode?.paths ?? [];
     const activePaths = activeNode?.paths ?? [];
     const columns = [];
+    const selectedNames = getColumnNames(selectedPaths, +steps);
+    const activeNames = getColumnNames(activePaths, +steps);
+    const selectedTransitions = getTransitionCounts(selectedPaths, +steps);
+    const activeTransitions = getTransitionKeys(activePaths, +steps);
 
     for (let columnIndex = 0; columnIndex < +steps; columnIndex++) {
       const nodes = {};
@@ -60,33 +64,28 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
         const name = items[columnIndex];
 
         if (name) {
-          const selected = !!selectedPaths.find(({ items }) => items[columnIndex] === name);
-          const active = selected && !!activePaths.find(({ items }) => items[columnIndex] === name);
-
           if (!nodes[name]) {
-            const paths = data.filter(({ items }) => items[columnIndex] === name);
+            const selected = selectedNames[columnIndex]?.has(name);
+            const active = selected && activeNames[columnIndex]?.has(name);
 
             nodes[name] = {
               name,
-              count,
-              totalCount: count,
+              totalCount: 0,
               nodeIndex,
               columnIndex,
               selected,
               active,
-              paths,
-              pathMap: paths.map(({ items, count }) => ({
-                [`${columnIndex}:${items.join(':')}`]: count,
-              })),
+              paths: [],
             };
-          } else {
-            nodes[name].totalCount += count;
           }
+
+          nodes[name].totalCount += count;
+          nodes[name].paths.push({ items, count });
         }
       });
 
       columns.push({
-        nodes: objectToArray(nodes).sort(firstBy('total', -1)),
+        nodes: objectToArray(nodes).sort(firstBy('totalCount', -1)),
       });
     }
 
@@ -102,18 +101,15 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
 
           const lines =
             previousNodes?.reduce((arr: any[][], previousNode: any, previousNodeIndex: number) => {
-              const fromCount = selectedNode?.paths.reduce((sum, path) => {
-                if (
-                  previousNode.name === path.items[columnIndex - 1] &&
-                  currentNode.name === path.items[columnIndex]
-                ) {
-                  sum += path.count;
-                }
-                return sum;
-              }, 0);
+              const transition = getTransitionKey(columnIndex, previousNode.name, currentNode.name);
+              const fromCount = selectedTransitions.get(transition) || 0;
 
               if (currentNode.selected && previousNode.selected && fromCount) {
-                arr.push([previousNodeIndex, currentNodeIndex]);
+                arr.push([
+                  previousNodeIndex,
+                  currentNodeIndex,
+                  activeNode ? activeTransitions.has(transition) : false,
+                ]);
                 selectedCount += fromCount;
 
                 if (previousNode.active) {
@@ -150,7 +146,7 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
     });
 
     return columns;
-  }, [data, selectedNode, activeNode]);
+  }, [data, selectedNode, activeNode, steps]);
 
   const handleClick = (name: string, columnIndex: number, paths: any[]) => {
     if (name !== selectedNode?.name || columnIndex !== selectedNode?.columnIndex) {
@@ -248,7 +244,7 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
                               </TooltipTrigger>
                             </div>
                             {columnIndex < columns.length &&
-                              lines.map(([fromIndex, nodeIndex], i) => {
+                              lines.map(([fromIndex, nodeIndex, isActive], i) => {
                                 const height =
                                   (Math.abs(nodeIndex - fromIndex) + 1) * (NODE_HEIGHT + NODE_GAP) -
                                   NODE_GAP;
@@ -256,19 +252,12 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
                                   (Math.abs(nodeIndex - fromIndex) - 1) * (NODE_HEIGHT + NODE_GAP) +
                                   NODE_GAP +
                                   LINE_WIDTH;
-                                const nodeName = columns[columnIndex - 1]?.nodes[fromIndex].name;
 
                                 return (
                                   <div
                                     key={`${fromIndex}${nodeIndex}${i}`}
                                     className={classNames(styles.line, {
-                                      [styles.active]:
-                                        active &&
-                                        activeNode?.paths.find(
-                                          (path: { items: any[] }) =>
-                                            path.items[columnIndex] === name &&
-                                            path.items[columnIndex - 1] === nodeName,
-                                        ),
+                                      [styles.active]: active && isActive,
                                       [styles.up]: fromIndex < nodeIndex,
                                       [styles.down]: fromIndex > nodeIndex,
                                       [styles.flat]: fromIndex === nodeIndex,
@@ -299,4 +288,56 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
       </div>
     </LoadingPanel>
   );
+}
+
+function getColumnNames(paths: any[], steps: number) {
+  const names = Array.from({ length: steps }, () => new Set<string>());
+
+  paths.forEach(({ items }) => {
+    for (let index = 0; index < steps; index++) {
+      if (items[index]) {
+        names[index].add(items[index]);
+      }
+    }
+  });
+
+  return names;
+}
+
+function getTransitionCounts(paths: any[], steps: number) {
+  const counts = new Map<string, number>();
+
+  paths.forEach(({ items, count }) => {
+    for (let index = 1; index < steps; index++) {
+      if (!items[index - 1] || !items[index]) {
+        continue;
+      }
+
+      const key = getTransitionKey(index, items[index - 1], items[index]);
+
+      counts.set(key, (counts.get(key) || 0) + count);
+    }
+  });
+
+  return counts;
+}
+
+function getTransitionKeys(paths: any[], steps: number) {
+  const keys = new Set<string>();
+
+  paths.forEach(({ items }) => {
+    for (let index = 1; index < steps; index++) {
+      if (!items[index - 1] || !items[index]) {
+        continue;
+      }
+
+      keys.add(getTransitionKey(index, items[index - 1], items[index]));
+    }
+  });
+
+  return keys;
+}
+
+function getTransitionKey(columnIndex: number, from: string, to: string) {
+  return `${columnIndex}:${from}:${to}`;
 }

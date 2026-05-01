@@ -17,8 +17,10 @@ export async function POST(request: Request) {
     return unauthorized();
   }
 
-  const filters = await getQueryFilters(body.filters, websiteId);
-  const parameters = await setWebsiteDate(websiteId, body.parameters);
+  const [parameters, filters] = await Promise.all([
+    setWebsiteDate(websiteId, body.parameters),
+    getQueryFilters(body.filters, websiteId),
+  ]);
 
   const data = await getRetention(websiteId, parameters as RetentionParameters, filters);
 

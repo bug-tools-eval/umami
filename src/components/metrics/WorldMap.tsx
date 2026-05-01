@@ -1,6 +1,6 @@
-import { Box, Column, type ColumnProps, FloatingTooltip, Text, useTheme } from '@umami/react-zen';
+import { Box, Column, type ColumnProps, FloatingTooltip, useTheme } from '@umami/react-zen';
 import { colord } from 'colord';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
 import {
   useCountryNames,
@@ -21,7 +21,7 @@ export interface WorldMapProps extends ColumnProps {
 export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
   const [tooltip, setTooltipPopup] = useState();
   const { theme } = useTheme();
-  const { colors } = getThemeColors(theme);
+  const { colors } = useMemo(() => getThemeColors(theme), [theme]);
   const { locale } = useLocale();
   const { t, labels } = useMessages();
   const { countryNames } = useCountryNames(locale);
@@ -32,37 +32,50 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
     type: 'country',
   });
 
-  const metrics = useMemo(
-    () => (data || mapData ? percentFilter((data || mapData) as any[]) : []),
-    [data, mapData],
-  );
+  const metrics = useMemo(() => {
+    const source = (data || mapData) as any[];
 
-  const getFillColor = (code: string) => {
-    if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
-
-    if (!country) {
-      return colors.map.fillColor;
+    if (!source) {
+      return [];
     }
 
-    return colord(colors.map.baseColor)
-      [theme === 'light' ? 'lighten' : 'darken'](0.4 * (1.0 - country.z / 100))
-      .toHex();
-  };
+    return source.every(({ z }) => z !== undefined) ? source : percentFilter(source);
+  }, [data, mapData]);
 
-  const getOpacity = (code: string) => {
+  const metricsByCountry = useMemo(() => new Map(metrics.map(item => [item.x, item])), [metrics]);
+
+  const getFillColor = useCallback(
+    (code: string) => {
+      if (code === 'AQ') return;
+      const country = metricsByCountry.get(code);
+
+      if (!country) {
+        return colors.map.fillColor;
+      }
+
+      return colord(colors.map.baseColor)
+        [theme === 'light' ? 'lighten' : 'darken'](0.4 * (1.0 - country.z / 100))
+        .toHex();
+    },
+    [colors.map.baseColor, colors.map.fillColor, metricsByCountry, theme],
+  );
+
+  const getOpacity = useCallback((code: string) => {
     return code === 'AQ' ? 0 : 1;
-  };
+  }, []);
 
-  const handleHover = (code: string) => {
-    if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
-    setTooltipPopup(
-      `${countryNames[code] || unknownLabel}: ${formatLongNumber(
-        country?.y || 0,
-      )} ${visitorsLabel}` as any,
-    );
-  };
+  const handleHover = useCallback(
+    (code: string) => {
+      if (code === 'AQ') return;
+      const country = metricsByCountry.get(code);
+      setTooltipPopup(
+        `${countryNames[code] || unknownLabel}: ${formatLongNumber(
+          country?.y || 0,
+        )} ${visitorsLabel}` as any,
+      );
+    },
+    [countryNames, metricsByCountry, unknownLabel, visitorsLabel],
+  );
 
   return (
     <Column

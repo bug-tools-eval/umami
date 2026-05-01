@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import thenby from 'thenby';
 import { useMessages, useWebsite } from '@/components/hooks';
 import { ListTable } from '@/components/metrics/ListTable';
@@ -9,25 +10,36 @@ export function RealtimeReferrers({ data }: { data: any }) {
   const { referrers } = data || {};
   const limit = 15;
 
-  const renderLink = ({ label: x }) => {
-    const domain = x.startsWith('/') ? website?.domain : '';
-    return (
-      <a href={`//${domain}${x}`} target="_blank" rel="noreferrer noopener">
-        {x}
-      </a>
-    );
-  };
+  const renderLink = useCallback(
+    ({ label: x }) => {
+      const domain = x.startsWith('/') ? website?.domain : '';
+      return (
+        <a href={`//${domain}${x}`} target="_blank" rel="noreferrer noopener">
+          {x}
+        </a>
+      );
+    },
+    [website?.domain],
+  );
 
-  const domains = percentFilter(
-    Object.keys(referrers)
-      .map(key => {
-        return {
-          x: key,
-          y: referrers[key],
-        };
-      })
-      .sort(thenby.firstBy('y', -1))
-      .slice(0, limit),
+  const domains = useMemo(
+    () =>
+      percentFilter(
+        Object.keys(referrers)
+          .map(key => {
+            return {
+              x: key,
+              y: referrers[key],
+            };
+          })
+          .sort(thenby.firstBy('y', -1))
+          .slice(0, limit),
+      ).map(({ x, y, z }: { x: string; y: number; z: number }) => ({
+        label: x,
+        count: y,
+        percent: z,
+      })),
+    [referrers],
   );
 
   return (
@@ -35,11 +47,7 @@ export function RealtimeReferrers({ data }: { data: any }) {
       title={t(labels.referrers)}
       metric={t(labels.views)}
       renderLabel={renderLink}
-      data={domains.map(({ x, y, z }: { x: string; y: number; z: number }) => ({
-        label: x,
-        count: y,
-        percent: z,
-      }))}
+      data={domains}
     />
   );
 }
