@@ -1,13 +1,11 @@
 import { FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
-import type { Filter, QueryFilters, QueryOptions } from '@/lib/types';
+import type { Filter, Operator, QueryFilters, QueryOptions } from '@/lib/types';
+
+const OPERATOR_REGEX = new RegExp(`^(${Object.values(OPERATORS).join('|')})\\.(.*)$`);
 
 export function parseFilterValue(param: any) {
   if (typeof param === 'string') {
-    const operatorValues = Object.values(OPERATORS).join('|');
-
-    const regex = new RegExp(`^(${operatorValues})\\.(.*)$`);
-
-    const [, operator, value] = param.match(regex) || [];
+    const [, operator, value] = param.match(OPERATOR_REGEX) || [];
 
     const resolvedOperator = operator || OPERATORS.equals;
     const resolvedValue = value ?? param;
@@ -39,40 +37,52 @@ export function isSearchOperator(operator: any) {
   ].includes(operator);
 }
 
+const SUFFIX_DIGITS_RE = /\d+$/;
+
 export function filtersObjectToArray(filters: QueryFilters, options: QueryOptions = {}): Filter[] {
   if (!filters) {
     return [];
   }
 
-  return Object.keys(filters).reduce((arr, key) => {
+  // Push into a single array instead of arr.concat() per key — concat
+  // allocates a new array on every iteration, making the helper quadratic
+  // in the number of filter keys. parseFilters calls this 2–3× per
+  // dashboard query, so the allocation churn adds up.
+  const result: Filter[] = [];
+
+  for (const key in filters) {
     const filter = filters[key];
 
     if (filter === undefined || filter === null) {
-      return arr;
+      continue;
     }
 
-    const baseName = key.replace(/\d+$/, '');
+    const baseName = key.replace(SUFFIX_DIGITS_RE, '');
     const paramName = key !== baseName ? key : undefined;
+    const column = options?.columns?.[baseName] ?? FILTER_COLUMNS[baseName];
 
     if (filter?.name && filter?.value !== undefined) {
-      return arr.concat({
+      result.push({
         ...filter,
-        column: options?.columns?.[baseName] ?? FILTER_COLUMNS[baseName],
+        column,
         paramName: paramName ?? filter.paramName,
       });
+      continue;
     }
 
     const { operator, value } = parseFilterValue(filter);
 
-    return arr.concat({
+    result.push({
       name: baseName,
       paramName,
-      column: options?.columns?.[baseName] ?? FILTER_COLUMNS[baseName],
-      operator,
+      column,
+      operator: operator as Operator,
       value,
       prefix: options?.prefix,
     });
-  }, []);
+  }
+
+  return result;
 }
 
 export function filtersArrayToObject(filters: Filter[]) {

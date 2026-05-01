@@ -5,6 +5,8 @@ import { useMessages } from './useMessages';
 import { useNavigation } from './useNavigation';
 import { useOperatorLabels } from './useOperatorLabels';
 
+const FILTER_VALUE_REGEX = /^([a-z]+)\.(.*)/;
+
 export function useFilters() {
   const { t, labels } = useMessages();
   const { query } = useNavigation();
@@ -63,7 +65,7 @@ export function useFilters() {
       let value = safeDecodeURIComponent(query[key]);
       const label = fields.find(({ name }) => name === baseName)?.label;
 
-      const match = value.match(/^([a-z]+)\.(.*)/);
+      const match = value.match(FILTER_VALUE_REGEX);
 
       if (match) {
         operator = match[1];

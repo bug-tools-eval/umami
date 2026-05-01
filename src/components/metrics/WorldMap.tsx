@@ -37,9 +37,17 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
     [data, mapData],
   );
 
+  // Map renders ~250 country geographies; building an index avoids an
+  // Array.find scan per geography on every paint and on every hover.
+  const metricsByCode = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const m of metrics) map.set(m.x, m);
+    return map;
+  }, [metrics]);
+
   const getFillColor = (code: string) => {
     if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
+    const country = metricsByCode.get(code);
 
     if (!country) {
       return colors.map.fillColor;
@@ -56,7 +64,7 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
 
   const handleHover = (code: string) => {
     if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
+    const country = metricsByCode.get(code);
     setTooltipPopup(
       `${countryNames[code] || unknownLabel}: ${formatLongNumber(
         country?.y || 0,

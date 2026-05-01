@@ -18,6 +18,11 @@ export function createSecureToken(payload: any, secret: any, options?: any) {
 }
 
 export function parseSecureToken(token: string, secret: any) {
+  // decrypt() runs pbkdf2Sync(10000) on every call — skip when the input
+  // has no chance of being a valid encrypted token (no Authorization header,
+  // empty bearer value).
+  if (!token) return null;
+
   try {
     return jwt.verify(decrypt(token, secret), secret);
   } catch {

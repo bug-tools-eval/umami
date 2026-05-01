@@ -20,43 +20,37 @@ export async function getRealtimeData(websiteId: string, filters: QueryFilters) 
     getSessionStats(websiteId, filters),
   ]);
 
-  const uniques = new Set();
+  const uniques = new Set<string>();
+  const countries: Record<string, number> = {};
+  const urls: Record<string, number> = {};
+  const referrers: Record<string, number> = {};
+  const events: any[] = [];
+  let eventCount = 0;
 
-  const { countries, urls, referrers, events } = activity.reverse().reduce(
-    (
-      obj: { countries: any; urls: any; referrers: any; events: any },
-      event: {
-        sessionId: string;
-        urlPath: string;
-        referrerDomain: string;
-        country: string;
-        eventName: string;
-      },
-    ) => {
-      const { countries, urls, referrers, events } = obj;
-      const { sessionId, urlPath, referrerDomain, country, eventName } = event;
+  // activity is newest-first; iterate oldest-first to build the per-session
+  // timeline without copying the array (.reverse()) and without a second
+  // .filter() pass for eventCount.
+  for (let i = activity.length - 1; i >= 0; i--) {
+    const event = activity[i];
+    const { sessionId, urlPath, referrerDomain, country, eventName } = event;
 
-      if (!uniques.has(sessionId)) {
-        uniques.add(sessionId);
-        increment(countries, country);
+    if (!uniques.has(sessionId)) {
+      uniques.add(sessionId);
+      increment(countries, country);
+      events.push({ __type: 'session', ...event });
+    }
 
-        events.push({ __type: 'session', ...event });
-      }
+    increment(urls, urlPath);
+    increment(referrers, referrerDomain);
 
-      increment(urls, urlPath);
-      increment(referrers, referrerDomain);
+    if (eventName) eventCount++;
+    events.push({ __type: eventName ? 'event' : 'pageview', ...event });
+  }
 
-      events.push({ __type: eventName ? 'event' : 'pageview', ...event });
-
-      return obj;
-    },
-    {
-      countries: {},
-      urls: {},
-      referrers: {},
-      events: [],
-    },
-  );
+  let viewsTotal = 0;
+  for (const p of pageviews) viewsTotal += Number(p.y) || 0;
+  let visitorsTotal = 0;
+  for (const s of sessions) visitorsTotal += Number(s.y) || 0;
 
   return {
     countries,
@@ -68,9 +62,9 @@ export async function getRealtimeData(websiteId: string, filters: QueryFilters) 
       visitors: sessions,
     },
     totals: {
-      views: pageviews.reduce((sum: number, { y }: { y: number }) => Number(sum) + Number(y), 0),
-      visitors: sessions.reduce((sum: number, { y }: { y: number }) => Number(sum) + Number(y), 0),
-      events: activity.filter(e => e.eventName).length,
+      views: viewsTotal,
+      visitors: visitorsTotal,
+      events: eventCount,
       countries: Object.keys(countries).length,
     },
     timestamp: Date.now(),

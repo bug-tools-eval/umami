@@ -39,13 +39,13 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
     group by website_event.event_id
   `;
 
-  const count = await rawQuery(
-    `select count(*) as num from (${eventQuery}) t`,
-    queryParams,
-  ).then((res: any) => res[0].num);
+  const [count, data] = await Promise.all([
+    rawQuery(`select count(*) as num from (${eventQuery}) t`, queryParams).then(
+      (res: any) => res[0].num,
+    ),
 
-  const data = await rawQuery(
-    `
+    rawQuery(
+      `
     with paged_events as (
       ${eventQuery}
       order by max(website_event.created_at) desc
@@ -70,9 +70,10 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
       and event_data.created_at between {{startDate}} and {{endDate}}
     order by event_data.created_at desc
     `,
-    queryParams,
-    FUNCTION_NAME,
-  );
+      queryParams,
+      FUNCTION_NAME,
+    ),
+  ]);
 
   return { data, count, page: +page, pageSize: size };
 }
@@ -106,13 +107,13 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
     group by event_data.event_id
   `;
 
-  const count = await rawQuery(
-    `select count(*) as num from (${eventQuery}) t`,
-    queryParams,
-  ).then((res: any) => res[0].num);
+  const [count, data] = await Promise.all([
+    rawQuery(`select count(*) as num from (${eventQuery}) t`, queryParams).then(
+      (res: any) => res[0].num,
+    ),
 
-  const data = await rawQuery(
-    `
+    rawQuery(
+      `
     with paged_events as (
       ${eventQuery}
       order by max(event_data.created_at) desc
@@ -144,9 +145,10 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
       and event_data.created_at between {startDate:DateTime64} and {endDate:DateTime64}
     order by event_data.created_at desc
     `,
-    queryParams,
-    FUNCTION_NAME,
-  );
+      queryParams,
+      FUNCTION_NAME,
+    ),
+  ]);
 
   return { data, count, page: +page, pageSize: size };
 }

@@ -259,10 +259,9 @@ async function rawQuery(sql: string, data: Record<string, any>, name?: string): 
     log('NAME:\n', name);
   }
   const params = [];
-  const schema = getSchema();
 
-  if (schema) {
-    await client.$executeRawUnsafe(`SET search_path TO "${schema}";`);
+  if (cachedSchema) {
+    await client.$executeRawUnsafe(`SET search_path TO "${cachedSchema}";`);
   }
 
   const query = sql?.replaceAll(/\{\{\s*(\w+)(::\w+)?\s*}}/g, (...args) => {
@@ -322,11 +321,10 @@ async function pagedRawQuery(
     .filter(n => n)
     .join('\n');
 
-  const count = await rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(
-    res => res[0].num,
-  );
-
-  const data = await rawQuery(`${query}${statements}`, queryParams, name);
+  const [count, data] = await Promise.all([
+    rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(res => res[0].num),
+    rawQuery(`${query}${statements}`, queryParams, name),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy };
 }
@@ -367,11 +365,13 @@ function getSchema() {
   return connectionUrl.searchParams.get('schema');
 }
 
+const cachedSchema = process.env.DATABASE_URL ? getSchema() : null;
+
 function getClient() {
   const url = process.env.DATABASE_URL;
   const replicaUrl = process.env.DATABASE_REPLICA_URL;
   const logQuery = process.env.LOG_QUERY;
-  const schema = getSchema();
+  const schema = cachedSchema;
 
   const baseAdapter = new PrismaPg({ connectionString: url }, { schema });
 

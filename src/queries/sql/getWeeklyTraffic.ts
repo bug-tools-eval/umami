@@ -53,7 +53,7 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
 
   let sql = '';
 
-  if (EVENT_COLUMNS.some(item => Object.keys(filters).includes(item))) {
+  if (EVENT_COLUMNS.some(item => item in filters)) {
     sql = `
     select
       formatDateTime(toDateTime(created_at, '${timezone}'), '%w:%H') as time,
@@ -89,17 +89,18 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
 }
 
 function formatResults(data: any) {
+  const valueByTime = new Map<string, any>();
+  for (const row of data) {
+    valueByTime.set(row.time, row.value);
+  }
+
   const days = [];
 
   for (let i = 0; i < 7; i++) {
     days.push([]);
 
     for (let j = 0; j < 24; j++) {
-      days[i].push(
-        Number(
-          data.find(({ time }) => time === `${i}:${j.toString().padStart(2, '0')}`)?.value || 0,
-        ),
-      );
+      days[i].push(Number(valueByTime.get(`${i}:${j.toString().padStart(2, '0')}`) || 0));
     }
   }
 

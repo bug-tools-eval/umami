@@ -76,12 +76,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Client info for bot/IP checks
-    const { ip, userAgent } = await getClientInfo(request, {});
-
-    if (!process.env.DISABLE_BOT_CHECK && isbot(userAgent)) {
-      return json({ beep: 'boop' });
+    // Bot check before geo/UA parsing so bot traffic short-circuits
+    // without running maxmind / UAParser.
+    if (!process.env.DISABLE_BOT_CHECK) {
+      const candidateUserAgent = request.headers.get('user-agent');
+      if (isbot(candidateUserAgent)) {
+        return json({ beep: 'boop' });
+      }
     }
+
+    // Client info for IP block check
+    const { ip } = await getClientInfo(request, {});
 
     if (hasBlockedIp(ip)) {
       return forbidden();

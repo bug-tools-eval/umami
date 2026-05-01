@@ -121,16 +121,19 @@ export async function POST(request: Request) {
       }
     }
 
+    // Bot check (do this before geo / UA parsing to avoid wasted work on bot traffic)
+    if (!process.env.DISABLE_BOT_CHECK) {
+      const candidateUserAgent = payload?.userAgent || request.headers.get('user-agent');
+      if (isbot(candidateUserAgent)) {
+        return json({ beep: 'boop' });
+      }
+    }
+
     // Client info
     const { ip, userAgent, device, browser, os, country, region, city } = await getClientInfo(
       request,
       payload,
     );
-
-    // Bot check
-    if (!process.env.DISABLE_BOT_CHECK && isbot(userAgent)) {
-      return json({ beep: 'boop' });
-    }
 
     // IP block
     if (hasBlockedIp(ip)) {
