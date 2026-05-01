@@ -31,15 +31,15 @@ export async function POST(request: Request) {
 
   const { id, role, createdAt } = user;
 
-  let token: string;
-
-  if (redis.enabled) {
-    token = await saveAuth({ userId: id, role });
-  } else {
-    token = createSecureToken({ userId: user.id, role }, secret());
-  }
-
-  const teams = await getAllUserTeams(id);
+  // Token issuance and the team lookup don't depend on each other; run them
+  // in parallel so the login round trip is bounded by max(token, teams)
+  // instead of their sum.
+  const [token, teams] = await Promise.all([
+    redis.enabled
+      ? saveAuth({ userId: id, role })
+      : Promise.resolve(createSecureToken({ userId: user.id, role }, secret())),
+    getAllUserTeams(id),
+  ]);
 
   return json({
     token,
