@@ -116,12 +116,56 @@ async function clickhouseQuery(
     endDate,
     timezone,
   });
+  const dateSQL = getDateSQL('created_at', unit, timezone);
+
+  if (!filterQuery && !cohortQuery) {
+    return rawQuery(
+      `
+      WITH session_days AS (
+        select
+          session_id,
+          min(${dateSQL}) as cohort_date,
+          groupUniqArray(${dateSQL}) as activity_dates
+        from website_event
+        where website_id = {websiteId:UUID}
+          and created_at between {startDate:DateTime64} and {endDate:DateTime64}
+        group by session_id
+      ),
+      cohort_size as (
+        select
+          cohort_date,
+          count() as visitors
+        from session_days
+        group by 1
+      ),
+      cohort_date as (
+        select
+          cohort_date,
+          toInt32((arrayJoin(activity_dates) - cohort_date) / 86400) as day_number,
+          count() as visitors
+        from session_days
+        group by 1, 2
+      )
+      select
+        c.cohort_date as date,
+        c.day_number as day,
+        s.visitors as visitors,
+        c.visitors returnVisitors,
+        c.visitors * 100 / s.visitors as percentage
+      from cohort_date c
+      join cohort_size s
+      on c.cohort_date = s.cohort_date
+      where c.day_number <= 31
+      order by 1, 2`,
+      queryParams,
+    );
+  }
 
   return rawQuery(
     `
     WITH cohort_items AS (
       select
-        min(${getDateSQL('created_at', unit, timezone)}) as cohort_date,
+        min(${dateSQL}) as cohort_date,
         session_id
       from website_event
       ${cohortQuery}
@@ -133,7 +177,7 @@ async function clickhouseQuery(
     user_activities AS (
       select distinct
         website_event.session_id as session_id,
-        toInt32((${getDateSQL('created_at', unit, timezone)} - cohort_items.cohort_date) / 86400) as day_number
+        toInt32((${dateSQL} - cohort_items.cohort_date) / 86400) as day_number
       from website_event
       join cohort_items
       on website_event.session_id = cohort_items.session_id
