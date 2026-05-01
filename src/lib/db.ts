@@ -19,8 +19,14 @@ export function getDatabaseType(url = process.env.DATABASE_URL) {
   return type;
 }
 
+// Both DATABASE_URL and CLICKHOUSE_URL are runtime-immutable; resolve the
+// dispatch target once at module init instead of re-reading env vars
+// (and re-splitting DATABASE_URL) on every query.
+const useClickhouse = !!process.env.CLICKHOUSE_URL;
+const usePostgres = !useClickhouse && getDatabaseType() === POSTGRESQL;
+
 export async function runQuery(queries: any) {
-  if (process.env.CLICKHOUSE_URL) {
+  if (useClickhouse) {
     if (queries[KAFKA]) {
       return queries[KAFKA]();
     }
@@ -28,9 +34,7 @@ export async function runQuery(queries: any) {
     return queries[CLICKHOUSE]();
   }
 
-  const db = getDatabaseType();
-
-  if (db === POSTGRESQL) {
+  if (usePostgres) {
     return queries[PRISMA]();
   }
 }
