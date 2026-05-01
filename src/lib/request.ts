@@ -15,13 +15,14 @@ export async function parseRequest(
   options?: { skipAuth: boolean },
 ): Promise<any> {
   const url = new URL(request.url);
+  const isGet = request.method === 'GET';
+  const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
   let query = Object.fromEntries(url.searchParams);
-  let body = await getJsonBody(request);
+  let body = hasBody ? await getJsonBody(request) : undefined;
   let error: () => undefined | undefined | Response;
   let auth = null;
 
   if (schema) {
-    const isGet = request.method === 'GET';
     const rawQuery = query;
     const result = schema.safeParse(isGet ? query : body);
 

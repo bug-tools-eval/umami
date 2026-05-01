@@ -2,6 +2,13 @@ import { FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
 import type { Filter, Operator, QueryFilters, QueryOptions } from '@/lib/types';
 
 const OPERATOR_REGEX = new RegExp(`^(${Object.values(OPERATORS).join('|')})\\.(.*)$`);
+const EQUALITY_OPERATORS = new Set([OPERATORS.equals, OPERATORS.notEquals]);
+const SEARCH_OPERATORS = new Set([
+  OPERATORS.contains,
+  OPERATORS.doesNotContain,
+  OPERATORS.regex,
+  OPERATORS.notRegex,
+]);
 
 export function parseFilterValue(param: any) {
   if (typeof param === 'string') {
@@ -25,16 +32,11 @@ export function parseFilterValue(param: any) {
 }
 
 export function isEqualsOperator(operator: any) {
-  return [OPERATORS.equals, OPERATORS.notEquals].includes(operator);
+  return EQUALITY_OPERATORS.has(operator);
 }
 
 export function isSearchOperator(operator: any) {
-  return [
-    OPERATORS.contains,
-    OPERATORS.doesNotContain,
-    OPERATORS.regex,
-    OPERATORS.notRegex,
-  ].includes(operator);
+  return SEARCH_OPERATORS.has(operator);
 }
 
 export function filtersObjectToArray(filters: QueryFilters, options: QueryOptions = {}): Filter[] {

@@ -15,6 +15,8 @@ export interface BreakdownData {
   y: number;
 }
 
+const SESSION_COLUMN_SET = new Set(SESSION_COLUMNS);
+
 export async function getBreakdown(
   ...args: [websiteId: string, parameters: BreakdownParameters, filters: QueryFilters]
 ) {
@@ -31,6 +33,8 @@ async function relationalQuery(
 ): Promise<BreakdownData[]> {
   const { getTimestampDiffSQL, parseFilters, rawQuery } = prisma;
   const { startDate, endDate, fields } = parameters;
+  const selectFields = parseFields(fields);
+  const groupFields = parseFieldsByName(fields);
   const { filterQuery, joinSessionQuery, cohortQuery, queryParams } = parseFilters(
     {
       ...filters,
@@ -40,7 +44,7 @@ async function relationalQuery(
       eventType: EVENT_TYPE.pageView,
     },
     {
-      joinSession: !!fields.find((name: string) => SESSION_COLUMNS.includes(name)),
+      joinSession: fields.some((name: string) => SESSION_COLUMN_SET.has(name)),
     },
   );
 
@@ -52,10 +56,10 @@ async function relationalQuery(
       count(distinct t.visit_id) as "visits",
       sum(case when t.c = 1 then 1 else 0 end) as "bounces",
       sum(${getTimestampDiffSQL('t.min_time', 't.max_time')}) as "totaltime",
-      ${parseFieldsByName(fields)}
+      ${groupFields}
     from (
       select
-        ${parseFields(fields)},
+        ${selectFields},
         website_event.session_id,
         website_event.visit_id,
         count(*) as "c",
@@ -67,10 +71,10 @@ async function relationalQuery(
       where website_event.website_id = {{websiteId::uuid}}
         and website_event.created_at between {{startDate}} and {{endDate}}
         ${filterQuery}
-      group by ${parseFieldsByName(fields)}, 
+      group by ${groupFields},
         website_event.session_id, website_event.visit_id
     ) as t
-    group by ${parseFieldsByName(fields)}
+    group by ${groupFields}
     order by 2 desc, 1 desc
     limit 500
     `,
@@ -85,6 +89,8 @@ async function clickhouseQuery(
 ): Promise<BreakdownData[]> {
   const { parseFilters, rawQuery } = clickhouse;
   const { startDate, endDate, fields } = parameters;
+  const selectFields = parseFields(fields);
+  const groupFields = parseFieldsByName(fields);
   const { filterQuery, cohortQuery, queryParams } = parseFilters({
     ...filters,
     websiteId,
@@ -101,10 +107,10 @@ async function clickhouseQuery(
       count(distinct t.visit_id) as "visits",
       sum(if(t.c = 1, 1, 0)) as "bounces",
       sum(max_time-min_time) as "totaltime",
-      ${parseFieldsByName(fields)}
+      ${groupFields}
     from (
       select
-        ${parseFields(fields)},
+        ${selectFields},
         session_id,
         visit_id,
         count(*) c,
@@ -115,10 +121,10 @@ async function clickhouseQuery(
       where website_id = {websiteId:UUID}
         and created_at between {startDate:DateTime64} and {endDate:DateTime64}
         ${filterQuery}
-      group by ${parseFieldsByName(fields)}, 
+      group by ${groupFields},
         session_id, visit_id
     ) as t
-    group by ${parseFieldsByName(fields)}
+    group by ${groupFields}
     order by 2 desc, 1 desc
     limit 500
     `,

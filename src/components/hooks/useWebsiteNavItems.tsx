@@ -158,12 +158,17 @@ export function useWebsiteNavItems(websiteId: string) {
     [labels, renderPath, t],
   );
 
-  const selectedKey = useMemo(
-    () =>
-      items.flatMap(e => e.items).find(({ path }) => path && pathname.endsWith(path.split('?')[0]))
-        ?.id,
-    [items, pathname],
-  );
+  const selectedKey = useMemo(() => getSelectedKey(items, pathname), [items, pathname]);
 
   return { items, selectedKey, renderPath };
+}
+
+function getSelectedKey(items: any[], pathname: string) {
+  for (const section of items) {
+    for (const { id, path } of section.items) {
+      if (path && pathname.endsWith(path.split('?')[0])) {
+        return id;
+      }
+    }
+  }
 }

@@ -17,6 +17,8 @@ export interface MetricLabelProps {
   onClick?: () => void;
 }
 
+const GROUPED_DOMAIN_NAMES = new Map(GROUPED_DOMAINS.map(({ domain, name }) => [domain, name]));
+
 export function MetricLabel({ type, data }: MetricLabelProps) {
   const { t, labels } = useMessages();
   const { formatValue, formatCity } = useFormat();
@@ -119,7 +121,7 @@ export function MetricLabel({ type, data }: MetricLabelProps) {
       if (label === 'Other') {
         return `(${t(labels.other)})`;
       } else {
-        const name = GROUPED_DOMAINS.find(({ domain }) => domain === label)?.name;
+        const name = GROUPED_DOMAIN_NAMES.get(label);
 
         if (!name) {
           return null;

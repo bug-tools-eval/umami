@@ -6,22 +6,21 @@ export function flattenJSON(
   keyValues: { key: string; value: any; dataType: DynamicDataType }[] = [],
   parentKey = '',
 ): { key: string; value: any; dataType: DynamicDataType }[] {
-  return Object.keys(eventData).reduce(
-    (acc, key) => {
-      const value = eventData[key];
-      const type = typeof eventData[key];
+  const acc = { keyValues, parentKey };
 
-      // nested object
-      if (value && type === 'object' && !Array.isArray(value) && !isValidDateValue(value)) {
-        flattenJSON(value, acc.keyValues, getKeyName(key, parentKey));
-      } else {
-        createKey(getKeyName(key, parentKey), value, acc);
-      }
+  for (const key of Object.keys(eventData)) {
+    const value = eventData[key];
+    const type = typeof value;
 
-      return acc;
-    },
-    { keyValues, parentKey },
-  ).keyValues;
+    // nested object
+    if (value && type === 'object' && !Array.isArray(value) && !isValidDateValue(value)) {
+      flattenJSON(value, acc.keyValues, getKeyName(key, parentKey));
+    } else {
+      createKey(getKeyName(key, parentKey), value, acc);
+    }
+  }
+
+  return acc.keyValues;
 }
 
 export function isValidDateValue(value: string) {
@@ -90,5 +89,5 @@ function getKeyName(key: string, parentKey: string) {
 }
 
 export function objectToArray(obj: object) {
-  return Object.keys(obj).map(key => obj[key]);
+  return Object.values(obj);
 }

@@ -88,13 +88,23 @@ export async function POST(request: Request) {
     }
 
     // Compute timestamps from events
-    const eventTimestamps = events
-      .map((e: any) => Number(e?.timestamp))
-      .filter((t: number) => Number.isFinite(t) && t > 0);
-
     const fallbackMs = (timestamp || Math.floor(Date.now() / 1000)) * 1000;
-    const minTimestamp = eventTimestamps.length ? Math.min(...eventTimestamps) : fallbackMs;
-    const maxTimestamp = eventTimestamps.length ? Math.max(...eventTimestamps) : fallbackMs;
+    let minTimestamp = Number.POSITIVE_INFINITY;
+    let maxTimestamp = 0;
+
+    for (const event of events) {
+      const eventTimestamp = Number(event?.timestamp);
+
+      if (Number.isFinite(eventTimestamp) && eventTimestamp > 0) {
+        minTimestamp = Math.min(minTimestamp, eventTimestamp);
+        maxTimestamp = Math.max(maxTimestamp, eventTimestamp);
+      }
+    }
+
+    if (!maxTimestamp) {
+      minTimestamp = fallbackMs;
+      maxTimestamp = fallbackMs;
+    }
 
     const startedAt = new Date(minTimestamp);
     const endedAt = new Date(maxTimestamp);

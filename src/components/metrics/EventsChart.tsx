@@ -30,17 +30,20 @@ export function EventsChart({ websiteId, focusLabel, limit }: EventsChartProps) 
   const chartData: any = useMemo(() => {
     if (!data) return;
 
-    const map = (data as any[]).reduce((obj, { x, t, y }) => {
-      if (!obj[x]) {
-        obj[x] = [];
+    const map = new Map<string, { x: string; y: number }[]>();
+
+    (data as any[]).forEach(({ x, t, y }) => {
+      let series = map.get(x);
+
+      if (!series) {
+        series = [];
+        map.set(x, series);
       }
 
-      obj[x].push({ x: t, y });
+      series.push({ x: t, y });
+    });
 
-      return obj;
-    }, {});
-
-    if (!map || Object.keys(map).length === 0) {
+    if (map.size === 0) {
       return {
         datasets: [
           {
@@ -51,22 +54,30 @@ export function EventsChart({ websiteId, focusLabel, limit }: EventsChartProps) 
         ],
       };
     } else {
+      const datasets = [];
+      let index = 0;
+
+      for (const [key, series] of map) {
+        const color = colord(CHART_COLORS[index % CHART_COLORS.length]);
+
+        datasets.push({
+          label: key,
+          data: generateTimeSeries(series, startDate, endDate, unit, dateLocale),
+          lineTension: 0,
+          backgroundColor: color.alpha(0.6).toRgbString(),
+          borderColor: color.alpha(0.7).toRgbString(),
+          borderWidth: 1,
+        });
+
+        index++;
+      }
+
       return {
-        datasets: Object.keys(map).map((key, index) => {
-          const color = colord(CHART_COLORS[index % CHART_COLORS.length]);
-          return {
-            label: key,
-            data: generateTimeSeries(map[key], startDate, endDate, unit, dateLocale),
-            lineTension: 0,
-            backgroundColor: color.alpha(0.6).toRgbString(),
-            borderColor: color.alpha(0.7).toRgbString(),
-            borderWidth: 1,
-          };
-        }),
+        datasets,
         focusLabel,
       };
     }
-  }, [data, startDate, endDate, unit, focusLabel]);
+  }, [data, startDate, endDate, unit, focusLabel, dateLocale]);
 
   useEffect(() => {
     if (label !== focusLabel) {

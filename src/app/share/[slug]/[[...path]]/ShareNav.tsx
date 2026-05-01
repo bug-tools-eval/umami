@@ -1,10 +1,3 @@
-import { IconLabel } from '@/components/common/IconLabel';
-import { useMessages, useNavigation, useShare } from '@/components/hooks';
-import { AlignEndHorizontal, Clock, Eye, PanelLeft, Sheet, Tag, User } from '@/components/icons';
-import { LanguageButton } from '@/components/input/LanguageButton';
-import { PreferencesButton } from '@/components/input/PreferencesButton';
-import { Funnel, Gauge, Lightning, Magnet, Money, Network, Path, Target } from '@/components/svg';
-import { buildPath } from '@/lib/url';
 import {
   Button,
   Column,
@@ -16,7 +9,15 @@ import {
   Tooltip,
   TooltipTrigger,
 } from '@umami/react-zen';
+import { useCallback, useMemo } from 'react';
+import { IconLabel } from '@/components/common/IconLabel';
 import Link from '@/components/common/Link';
+import { useMessages, useNavigation, useShare } from '@/components/hooks';
+import { AlignEndHorizontal, Clock, Eye, PanelLeft, Sheet, Tag, User } from '@/components/icons';
+import { LanguageButton } from '@/components/input/LanguageButton';
+import { PreferencesButton } from '@/components/input/PreferencesButton';
+import { Funnel, Gauge, Lightning, Magnet, Money, Network, Path, Target } from '@/components/svg';
+import { buildPath } from '@/lib/url';
 import { ShareBranding } from './ShareBranding';
 
 export function ShareNav({
@@ -33,102 +34,125 @@ export function ShareNav({
   const { pathname, query } = useNavigation();
   const { slug, parameters } = share;
 
-  const renderPath = (path: string) =>
-    buildPath(`/share/${slug}${path}`, {
-      ...query,
-      event: undefined,
-      compare: undefined,
-      view: undefined,
-      unit: undefined,
-      excludeBounce: undefined,
-    });
+  const renderPath = useCallback(
+    (path: string) =>
+      buildPath(`/share/${slug}${path}`, {
+        ...query,
+        event: undefined,
+        compare: undefined,
+        view: undefined,
+        unit: undefined,
+        excludeBounce: undefined,
+      }),
+    [query, slug],
+  );
 
-  const allItems = [
-    {
-      section: 'traffic',
-      label: t(labels.traffic),
-      items: [
-        { id: 'overview', label: t(labels.overview), icon: <Eye />, path: renderPath('') },
-        { id: 'events', label: t(labels.events), icon: <Lightning />, path: renderPath('/events') },
-        {
-          id: 'sessions',
-          label: t(labels.sessions),
-          icon: <User />,
-          path: renderPath('/sessions'),
-        },
-        {
-          id: 'realtime',
-          label: t(labels.realtime),
-          icon: <Clock />,
-          path: renderPath('/realtime'),
-        },
-        {
-          id: 'performance',
-          label: t(labels.performance),
-          icon: <Gauge />,
-          path: renderPath('/performance'),
-        },
-        {
-          id: 'compare',
-          label: t(labels.compare),
-          icon: <AlignEndHorizontal />,
-          path: renderPath('/compare'),
-        },
-        {
-          id: 'breakdown',
-          label: t(labels.breakdown),
-          icon: <Sheet />,
-          path: renderPath('/breakdown'),
-        },
-      ],
-    },
-    {
-      section: 'behavior',
-      label: t(labels.behavior),
-      items: [
-        { id: 'goals', label: t(labels.goals), icon: <Target />, path: renderPath('/goals') },
-        { id: 'funnels', label: t(labels.funnels), icon: <Funnel />, path: renderPath('/funnels') },
-        {
-          id: 'journeys',
-          label: t(labels.journeys),
-          icon: <Path />,
-          path: renderPath('/journeys'),
-        },
-        {
-          id: 'retention',
-          label: t(labels.retention),
-          icon: <Magnet />,
-          path: renderPath('/retention'),
-        },
-      ],
-    },
-    {
-      section: 'growth',
-      label: t(labels.growth),
-      items: [
-        { id: 'utm', label: t(labels.utm), icon: <Tag />, path: renderPath('/utm') },
-        { id: 'revenue', label: t(labels.revenue), icon: <Money />, path: renderPath('/revenue') },
-        {
-          id: 'attribution',
-          label: t(labels.attribution),
-          icon: <Network />,
-          path: renderPath('/attribution'),
-        },
-      ],
-    },
-  ];
+  const allItems = useMemo(
+    () => [
+      {
+        section: 'traffic',
+        label: t(labels.traffic),
+        items: [
+          { id: 'overview', label: t(labels.overview), icon: <Eye />, path: renderPath('') },
+          {
+            id: 'events',
+            label: t(labels.events),
+            icon: <Lightning />,
+            path: renderPath('/events'),
+          },
+          {
+            id: 'sessions',
+            label: t(labels.sessions),
+            icon: <User />,
+            path: renderPath('/sessions'),
+          },
+          {
+            id: 'realtime',
+            label: t(labels.realtime),
+            icon: <Clock />,
+            path: renderPath('/realtime'),
+          },
+          {
+            id: 'performance',
+            label: t(labels.performance),
+            icon: <Gauge />,
+            path: renderPath('/performance'),
+          },
+          {
+            id: 'compare',
+            label: t(labels.compare),
+            icon: <AlignEndHorizontal />,
+            path: renderPath('/compare'),
+          },
+          {
+            id: 'breakdown',
+            label: t(labels.breakdown),
+            icon: <Sheet />,
+            path: renderPath('/breakdown'),
+          },
+        ],
+      },
+      {
+        section: 'behavior',
+        label: t(labels.behavior),
+        items: [
+          { id: 'goals', label: t(labels.goals), icon: <Target />, path: renderPath('/goals') },
+          {
+            id: 'funnels',
+            label: t(labels.funnels),
+            icon: <Funnel />,
+            path: renderPath('/funnels'),
+          },
+          {
+            id: 'journeys',
+            label: t(labels.journeys),
+            icon: <Path />,
+            path: renderPath('/journeys'),
+          },
+          {
+            id: 'retention',
+            label: t(labels.retention),
+            icon: <Magnet />,
+            path: renderPath('/retention'),
+          },
+        ],
+      },
+      {
+        section: 'growth',
+        label: t(labels.growth),
+        items: [
+          { id: 'utm', label: t(labels.utm), icon: <Tag />, path: renderPath('/utm') },
+          {
+            id: 'revenue',
+            label: t(labels.revenue),
+            icon: <Money />,
+            path: renderPath('/revenue'),
+          },
+          {
+            id: 'attribution',
+            label: t(labels.attribution),
+            icon: <Network />,
+            path: renderPath('/attribution'),
+          },
+        ],
+      },
+    ],
+    [labels, renderPath, t],
+  );
 
   // Filter items based on parameters
-  const items = allItems
-    .map(section => ({
-      label: section.label,
-      items: section.items.filter(item => parameters[item.id] === true),
-    }))
-    .filter(section => section.items.length > 0);
+  const items = useMemo(
+    () =>
+      allItems
+        .map(section => ({
+          label: section.label,
+          items: section.items.filter(item => parameters[item.id] === true),
+        }))
+        .filter(section => section.items.length > 0),
+    [allItems, parameters],
+  );
 
-  const selectedKey = items
-    .flatMap(e => e.items)
-    .find(({ path }) => path && pathname.endsWith(path.split('?')[0]))?.id;
+  const selectedKey = useMemo(() => getSelectedKey(items, pathname), [items, pathname]);
 
   const isMobile = !!onItemClick;
 
@@ -216,4 +240,14 @@ export function ShareNav({
       </Column>
     </Column>
   );
+}
+
+function getSelectedKey(items: any[], pathname: string) {
+  for (const section of items) {
+    for (const { id, path } of section.items) {
+      if (path && pathname.endsWith(path.split('?')[0])) {
+        return id;
+      }
+    }
+  }
 }

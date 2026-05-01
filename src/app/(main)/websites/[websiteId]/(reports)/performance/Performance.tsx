@@ -23,7 +23,7 @@ import { ListTable } from '@/components/metrics/ListTable';
 import { MetricLabel } from '@/components/metrics/MetricLabel';
 import { PerformanceCard } from '@/components/metrics/PerformanceCard';
 import { renderDateLabels } from '@/lib/charts';
-import { CHART_COLORS, WEB_VITALS_THRESHOLDS } from '@/lib/constants';
+import { CHART_COLORS } from '@/lib/constants';
 import { generateTimeSeries } from '@/lib/date';
 import { formatLongNumber } from '@/lib/format';
 import styles from './Performance.module.css';
@@ -76,18 +76,22 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
     const p50Color = colord(CHART_COLORS[0]);
     const p75Color = colord(CHART_COLORS[1]);
     const p95Color = colord(CHART_COLORS[2]);
+    const series = data.chart.reduce(
+      (arr, d: any) => {
+        arr.p50.push({ x: d.t, y: Number(d.p50) });
+        arr.p75.push({ x: d.t, y: Number(d.p75) });
+        arr.p95.push({ x: d.t, y: Number(d.p95) });
+
+        return arr;
+      },
+      { p50: [], p75: [], p95: [] },
+    );
 
     return {
       datasets: [
         {
           label: 'p50',
-          data: generateTimeSeries(
-            data.chart.map((d: any) => ({ x: d.t, y: Number(d.p50) })),
-            startDate,
-            endDate,
-            unit,
-            dateLocale,
-          ),
+          data: generateTimeSeries(series.p50, startDate, endDate, unit, dateLocale),
           type: 'line',
           borderColor: p50Color.alpha(0.8).toRgbString(),
           backgroundColor: p50Color.alpha(0.1).toRgbString(),
@@ -98,13 +102,7 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
         },
         {
           label: 'p75',
-          data: generateTimeSeries(
-            data.chart.map((d: any) => ({ x: d.t, y: Number(d.p75) })),
-            startDate,
-            endDate,
-            unit,
-            dateLocale,
-          ),
+          data: generateTimeSeries(series.p75, startDate, endDate, unit, dateLocale),
           type: 'line',
           borderColor: p75Color.alpha(0.8).toRgbString(),
           backgroundColor: p75Color.alpha(0.1).toRgbString(),
@@ -115,13 +113,7 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
         },
         {
           label: 'p95',
-          data: generateTimeSeries(
-            data.chart.map((d: any) => ({ x: d.t, y: Number(d.p95) })),
-            startDate,
-            endDate,
-            unit,
-            dateLocale,
-          ),
+          data: generateTimeSeries(series.p95, startDate, endDate, unit, dateLocale),
           type: 'line',
           borderColor: p95Color.alpha(0.8).toRgbString(),
           backgroundColor: p95Color.alpha(0.1).toRgbString(),
@@ -132,16 +124,31 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
         },
       ],
     };
-  }, [data, startDate, endDate, unit]);
+  }, [data, startDate, endDate, unit, dateLocale]);
 
   const renderXLabel = useCallback(renderDateLabels(unit, locale), [unit, locale]);
 
-  const threshold = WEB_VITALS_THRESHOLDS[selectedMetric as keyof typeof WEB_VITALS_THRESHOLDS];
   const isCls = selectedMetric === 'cls';
   const metricLabel = t(labels[selectedMetric]) || selectedMetric.toUpperCase();
   const formatListCount = isCls
     ? (n: number) => n.toFixed(3)
     : (n: number) => `${(n / 1000).toFixed(2)} s`;
+  const pages = useMemo(
+    () => getMetricRows(data?.pages, selectedPercentile),
+    [data?.pages, selectedPercentile],
+  );
+  const pageTitles = useMemo(
+    () => getMetricRows(data?.pageTitles, selectedPercentile),
+    [data?.pageTitles, selectedPercentile],
+  );
+  const devices = useMemo(
+    () => getMetricRows(data?.devices, selectedPercentile),
+    [data?.devices, selectedPercentile],
+  );
+  const browsers = useMemo(
+    () => getMetricRows(data?.browsers, selectedPercentile),
+    [data?.browsers, selectedPercentile],
+  );
 
   return (
     <Column gap>
@@ -213,17 +220,7 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
                       metric={metricLabel}
                       showPercentage={false}
                       formatCount={formatListCount}
-                      data={data.pages
-                        ?.filter(
-                          ({ p50, p75, p95 }: any) =>
-                            Number({ p50, p75, p95 }[selectedPercentile]) > 0,
-                        )
-                        .slice(0, 20)
-                        .map(({ name, p50, p75, p95 }: any) => ({
-                          label: name,
-                          count: Number({ p50, p75, p95 }[selectedPercentile]),
-                          percent: 0,
-                        }))}
+                      data={pages}
                       renderLabel={({ label }: { label: string }) => <Text>{label}</Text>}
                     />
                   </TabPanel>
@@ -232,17 +229,7 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
                       metric={metricLabel}
                       showPercentage={false}
                       formatCount={formatListCount}
-                      data={data.pageTitles
-                        ?.filter(
-                          ({ p50, p75, p95 }: any) =>
-                            Number({ p50, p75, p95 }[selectedPercentile]) > 0,
-                        )
-                        .slice(0, 20)
-                        .map(({ name, p50, p75, p95 }: any) => ({
-                          label: name,
-                          count: Number({ p50, p75, p95 }[selectedPercentile]),
-                          percent: 0,
-                        }))}
+                      data={pageTitles}
                       renderLabel={(row: any) => <MetricLabel type="title" data={row} />}
                     />
                   </TabPanel>
@@ -260,17 +247,7 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
                       metric={metricLabel}
                       showPercentage={false}
                       formatCount={formatListCount}
-                      data={data.devices
-                        ?.filter(
-                          ({ p50, p75, p95 }: any) =>
-                            Number({ p50, p75, p95 }[selectedPercentile]) > 0,
-                        )
-                        .slice(0, 20)
-                        .map(({ name, p50, p75, p95 }: any) => ({
-                          label: name,
-                          count: Number({ p50, p75, p95 }[selectedPercentile]),
-                          percent: 0,
-                        }))}
+                      data={devices}
                       renderLabel={(row: any) => <MetricLabel type="device" data={row} />}
                     />
                   </TabPanel>
@@ -279,17 +256,7 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
                       metric={metricLabel}
                       showPercentage={false}
                       formatCount={formatListCount}
-                      data={data.browsers
-                        ?.filter(
-                          ({ p50, p75, p95 }: any) =>
-                            Number({ p50, p75, p95 }[selectedPercentile]) > 0,
-                        )
-                        .slice(0, 20)
-                        .map(({ name, p50, p75, p95 }: any) => ({
-                          label: name,
-                          count: Number({ p50, p75, p95 }[selectedPercentile]),
-                          percent: 0,
-                        }))}
+                      data={browsers}
                       renderLabel={(row: any) => <MetricLabel type="browser" data={row} />}
                     />
                   </TabPanel>
@@ -301,4 +268,26 @@ export function Performance({ websiteId, startDate, endDate, unit }: Performance
       </LoadingPanel>
     </Column>
   );
+}
+
+function getMetricRows(data: any[] | undefined, percentile: 'p50' | 'p75' | 'p95') {
+  if (!data) {
+    return [];
+  }
+
+  const rows = [];
+
+  for (const row of data) {
+    const count = Number(row[percentile]);
+
+    if (count > 0) {
+      rows.push({ label: row.name, count, percent: 0 });
+    }
+
+    if (rows.length >= 20) {
+      break;
+    }
+  }
+
+  return rows;
 }

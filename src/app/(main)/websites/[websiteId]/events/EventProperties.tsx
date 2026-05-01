@@ -17,14 +17,30 @@ export function EventProperties({ websiteId }: { websiteId: string }) {
   const { t, labels } = useMessages();
   const { data, isLoading, isFetching, error } = useEventDataPropertiesQuery(websiteId);
 
-  const events: string[] = data
-    ? data.reduce((arr: string | any[], e: { eventName: any }) => {
-        return !arr.includes(e.eventName) ? arr.concat(e.eventName) : arr;
-      }, [])
-    : [];
-  const properties: string[] = eventName
-    ? data?.filter(e => e.eventName === eventName).map(e => e.propertyName)
-    : [];
+  const { events, propertiesByEvent } = useMemo(() => {
+    const events: string[] = [];
+    const eventNames = new Set<string>();
+    const propertiesByEvent = new Map<string, string[]>();
+
+    data?.forEach(({ eventName, propertyName }) => {
+      if (!eventNames.has(eventName)) {
+        eventNames.add(eventName);
+        events.push(eventName);
+      }
+
+      let properties = propertiesByEvent.get(eventName);
+
+      if (!properties) {
+        properties = [];
+        propertiesByEvent.set(eventName, properties);
+      }
+
+      properties.push(propertyName);
+    });
+
+    return { events, propertiesByEvent };
+  }, [data]);
+  const properties = eventName ? propertiesByEvent.get(eventName) || [] : [];
 
   return (
     <LoadingPanel
@@ -80,32 +96,45 @@ const EventValues = ({ websiteId, eventName, propertyName }) => {
     error,
   } = useEventDataValuesQuery(websiteId, eventName, propertyName);
 
-  const propertySum = useMemo(() => {
-    return values?.reduce((sum, { total }) => sum + total, 0) ?? 0;
-  }, [values]);
+  const { chartData, tableData } = useMemo(() => {
+    if (!propertyName || !values) {
+      return { chartData: null, tableData: [] };
+    }
 
-  const chartData = useMemo(() => {
-    if (!propertyName || !values) return null;
+    const labels: string[] = [];
+    const totals: number[] = [];
+    const rows: { label: string; count: number; percent: number }[] = [];
+    let propertySum = 0;
+
+    values.forEach(({ value, total }) => {
+      labels.push(value);
+      totals.push(total);
+      rows.push({ label: value, count: total, percent: 0 });
+      propertySum += total;
+    });
+
+    if (propertySum > 0) {
+      rows.forEach(row => {
+        row.percent = 100 * (row.count / propertySum);
+      });
+    } else {
+      rows.length = 0;
+    }
+
     return {
-      labels: values.map(({ value }) => value),
-      datasets: [
-        {
-          data: values.map(({ total }) => total),
-          backgroundColor: CHART_COLORS,
-          borderWidth: 0,
-        },
-      ],
+      chartData: {
+        labels,
+        datasets: [
+          {
+            data: totals,
+            backgroundColor: CHART_COLORS,
+            borderWidth: 0,
+          },
+        ],
+      },
+      tableData: rows,
     };
   }, [propertyName, values]);
-
-  const tableData = useMemo(() => {
-    if (!propertyName || !values || propertySum === 0) return [];
-    return values.map(({ value, total }) => ({
-      label: value,
-      count: total,
-      percent: 100 * (total / propertySum),
-    }));
-  }, [propertyName, values, propertySum]);
 
   return (
     <LoadingPanel

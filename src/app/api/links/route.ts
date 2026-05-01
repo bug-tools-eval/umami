@@ -42,7 +42,12 @@ export async function POST(request: Request) {
 
   const { id, name, url, slug, teamId } = body;
 
-  if ((teamId && !(await canCreateTeamWebsite(auth, teamId))) || !(await canCreateWebsite(auth))) {
+  const [canCreate, canCreateTeam] = await Promise.all([
+    canCreateWebsite(auth),
+    teamId ? canCreateTeamWebsite(auth, teamId) : Promise.resolve(true),
+  ]);
+
+  if (!canCreate || !canCreateTeam) {
     return unauthorized();
   }
 

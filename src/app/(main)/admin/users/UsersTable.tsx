@@ -1,12 +1,14 @@
 import { DataColumn, DataTable, Icon, MenuItem, Modal, Row, Text } from '@umami/react-zen';
-import Link from '@/components/common/Link';
 import { useState } from 'react';
 import { DateDistance } from '@/components/common/DateDistance';
+import Link from '@/components/common/Link';
 import { useMessages } from '@/components/hooks';
 import { Edit, Trash } from '@/components/icons';
 import { MenuButton } from '@/components/input/MenuButton';
 import { ROLES } from '@/lib/constants';
 import { UserDeleteForm } from './UserDeleteForm';
+
+const ROLE_LABELS = Object.fromEntries(Object.entries(ROLES).map(([key, value]) => [value, key]));
 
 export function UsersTable({
   data = [],
@@ -26,9 +28,7 @@ export function UsersTable({
           {(row: any) => <Link href={`/admin/users/${row.id}`}>{row.username}</Link>}
         </DataColumn>
         <DataColumn id="role" label={t(labels.role)}>
-          {(row: any) =>
-            t(labels[Object.keys(ROLES).find(key => ROLES[key] === row.role)] || labels.unknown)
-          }
+          {(row: any) => t(labels[ROLE_LABELS[row.role]] || labels.unknown)}
         </DataColumn>
         <DataColumn id="websites" label={t(labels.websites)}>
           {(row: any) => row._count.websites}
