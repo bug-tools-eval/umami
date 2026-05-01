@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useApp } from '@/store/app';
 import { useConfig } from './useConfig';
 
@@ -26,9 +27,10 @@ export function useSubscription(teamId?: string | null) {
   const config = useConfig();
 
   const ownSubscription: Subscription = user?.subscription || defaultSubscription;
-  const teamSubscription: Subscription | null = teamId
-    ? user?.teams?.find((t: any) => t.id === teamId)?.subscription ?? null
-    : null;
+  const teamSubscription: Subscription | null = useMemo(
+    () => (teamId ? (user?.teams?.find((t: any) => t.id === teamId)?.subscription ?? null) : null),
+    [teamId, user?.teams],
+  );
 
   const subscription: Subscription = teamSubscription || ownSubscription;
   const cloudMode = config?.cloudMode || false;

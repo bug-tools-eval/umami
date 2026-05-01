@@ -20,8 +20,10 @@ export async function POST(request: Request) {
     return unauthorized();
   }
 
-  const parameters = await setWebsiteDate(websiteId, body.parameters);
-  const filters = await getQueryFilters(body.filters, websiteId);
+  const [parameters, filters] = await Promise.all([
+    setWebsiteDate(websiteId, body.parameters),
+    getQueryFilters(body.filters, websiteId),
+  ]);
   const { compare = 'prev' } = parameters as RevenuParameters;
   const { startDate, endDate } = getCompareDate(compare, parameters.startDate, parameters.endDate);
 

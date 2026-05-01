@@ -31,6 +31,11 @@ import {
 import { DOCS_URL } from '@/lib/constants';
 import { languages } from '@/lib/lang';
 
+const LANGUAGE_ITEMS = Object.keys(languages).map(key => ({
+  value: key,
+  label: languages[key].label,
+}));
+
 export interface UserButtonProps {
   showText?: boolean;
   onClose?: () => void;
@@ -47,11 +52,6 @@ export function UserButton({ showText = true, onClose }: UserButtonProps) {
   const getUrl = (url: string) => {
     return cloudMode ? `${process.env.cloudUrl}${url}` : url;
   };
-
-  const languageItems = Object.keys(languages).map(key => ({
-    value: key,
-    label: languages[key].label,
-  }));
 
   const items = [
     cloudMode && {
@@ -137,7 +137,7 @@ export function UserButton({ showText = true, onClose }: UserButtonProps) {
                   onAction={key => saveLocale(key as string)}
                   style={{ maxHeight: 300, overflow: 'auto' }}
                 >
-                  {languageItems.map(({ value, label }) => (
+                  {LANGUAGE_ITEMS.map(({ value, label }) => (
                     <MenuItem key={value} id={value}>
                       <Text weight={value === locale ? 'bold' : undefined}>{label}</Text>
                     </MenuItem>

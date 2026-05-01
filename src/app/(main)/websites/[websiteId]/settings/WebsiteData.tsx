@@ -12,6 +12,8 @@ import { WebsiteDeleteForm } from './WebsiteDeleteForm';
 import { WebsiteResetForm } from './WebsiteResetForm';
 import { WebsiteTransferForm } from './WebsiteTransferForm';
 
+const TRANSFER_ROLES = new Set([ROLES.teamOwner, ROLES.teamManager]);
+
 export function WebsiteData({ websiteId, onSave }: { websiteId: string; onSave?: () => void }) {
   const { t, labels, messages } = useMessages();
   const { user } = useLoginQuery();
@@ -20,21 +22,7 @@ export function WebsiteData({ websiteId, onSave }: { websiteId: string; onSave?:
   const { data: teams } = useUserTeamsQuery(user.id);
   const isAdmin = pathname.startsWith('/admin');
 
-  const canTransferWebsite =
-    (
-      (!teamId &&
-        teams?.data?.filter(({ members }) =>
-          members.find(
-            ({ role, userId }) =>
-              [ROLES.teamOwner, ROLES.teamManager].includes(role) && userId === user.id,
-          ),
-        )) ||
-      []
-    ).length > 0 ||
-    (teamId &&
-      !!teams?.data
-        ?.find(({ id }) => id === teamId)
-        ?.members.find(({ role, userId }) => role === ROLES.teamOwner && userId === user.id));
+  const canTransferWebsite = canTransfer(teams?.data, teamId, user.id);
 
   const handleSave = () => {
     touch('websites');
@@ -92,4 +80,28 @@ export function WebsiteData({ websiteId, onSave }: { websiteId: string; onSave?:
       </ActionForm>
     </Column>
   );
+}
+
+function canTransfer(teams: any[] = [], teamId: string | null | undefined, userId: string) {
+  for (const { id, members = [] } of teams) {
+    if (teamId && id !== teamId) {
+      continue;
+    }
+
+    for (const { role, userId: memberUserId } of members) {
+      if (memberUserId !== userId) {
+        continue;
+      }
+
+      if (teamId) {
+        return role === ROLES.teamOwner;
+      }
+
+      if (TRANSFER_ROLES.has(role)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }

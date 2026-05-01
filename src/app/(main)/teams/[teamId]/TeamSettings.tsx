@@ -17,23 +17,17 @@ export function TeamSettings({ teamId }: { teamId: string }) {
   const { t, labels } = useMessages();
 
   const isAdmin = pathname.includes('/admin');
+  const { isTeamOwner, canManageTeam } = getTeamPermissions(team?.members, user.id);
 
-  const isTeamOwner =
-    !!team?.members?.find(({ userId, role }) => role === ROLES.teamOwner && userId === user.id) &&
-    user.role !== ROLES.viewOnly;
-
-  const canEdit =
-    user.isAdmin ||
-    (!!team?.members?.find(
-      ({ userId, role }) =>
-        (role === ROLES.teamOwner || role === ROLES.teamManager) && userId === user.id,
-    ) &&
-      user.role !== ROLES.viewOnly);
+  const allowOwnerActions = isTeamOwner && user.role !== ROLES.viewOnly;
+  const canEdit = user.isAdmin || (canManageTeam && user.role !== ROLES.viewOnly);
 
   return (
     <Column gap="6">
       <PageHeader title={team?.name} icon={<Users />}>
-        {!isTeamOwner && !isAdmin && <TeamLeaveButton teamId={team.id} teamName={team.name} />}
+        {!allowOwnerActions && !isAdmin && (
+          <TeamLeaveButton teamId={team.id} teamName={team.name} />
+        )}
       </PageHeader>
       <Panel>
         <TeamEditForm teamId={teamId} allowEdit={canEdit} showAccessCode={canEdit} />
@@ -45,11 +39,28 @@ export function TeamSettings({ teamId }: { teamId: string }) {
         </Row>
         <TeamMembersDataTable teamId={teamId} allowEdit={canEdit} />
       </Panel>
-      {isTeamOwner && (
+      {allowOwnerActions && (
         <Panel>
           <TeamManage teamId={teamId} />
         </Panel>
       )}
     </Column>
   );
+}
+
+function getTeamPermissions(members: any[] = [], userId: string) {
+  let isTeamOwner = false;
+  let canManageTeam = false;
+
+  for (const member of members) {
+    if (member.userId !== userId) {
+      continue;
+    }
+
+    isTeamOwner = member.role === ROLES.teamOwner;
+    canManageTeam = isTeamOwner || member.role === ROLES.teamManager;
+    break;
+  }
+
+  return { isTeamOwner, canManageTeam };
 }
